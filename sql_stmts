@@ -1,0 +1,65 @@
+SQL Statements Practice 
+
+1.	List the courses known to the database:
+
+select Mark.Course
+from Mark
+
+
+2.	List the student numbers of people taking Biology, Note that the courses are stored with their course codes, ex. BIOL
+
+Select R.StudNum 
+From Register as R
+Where R.Course = 'BIOL'
+
+
+3.	List the student numbers and names of students taking Biology, ordered by surname:
+
+Select  S.StudNum, S.SurName
+From Student as S, Register as R
+Where (R.Course = 'BIOL') and (S.StudNum = R.StudNum)
+Order by S.SurName
+
+
+4.	Count the number of students taking Biology: 
+
+Select  count(R.StudNum)
+From Register as R
+Where (R.Course = 'BIOL')
+
+
+5.	List the assignments (and exams) for Biology: 
+
+Select  A.AssignNum, C.Description
+From Assignment as A, Course as C
+Where (A.Course = 'BIOL') and (A.Course = C.Course)
+
+
+6.	List the student number, course code, assignment number, assignment description, assignment weight, and mark for all the philosophy marks for the student with ID 86088:
+
+select M.StudNum, A.Course, A.AssignNum, A.Description, A.Weighting, M.Mark
+from Assignment as A, Mark as M
+Where (M.StudNum = '86088') and (A.Course = M.Course) and (A.AssignNum = M.AssignNum)
+
+
+7.	Compute the final course grade in philosophy for the student with ID 86088:
+
+select sum(M.Mark*A.Weighting/100)
+from Mark as M, Assignment as A
+where (M.StudNum = '86088') and (M.Course = 'PHIL') and (M.AssignNum = A.AssignNum) and (M.Course = A.Course)
+
+
+8.	List the final course grades for students in Philosophy:
+
+select M.StudNum, sum(M.Mark*A.Weighting/100)
+from Mark as M, Assignment as A
+where (M.Course = 'PHIL') and (M.AssignNum = A.AssignNum) and (M.Course = A.Course)
+group by M.StudNum
+
+
+9.	Compute the final course grade in philosophy, for students who also took Biology:
+
+select M.StudNum, SUM(M.Mark * A.Weighting)/100
+from Mark as M, Assignment as A, Register as R
+where M.Course = 'PHIL' and R.Course = 'BIOL' and M.AssignNum = A.AssignNum and M.Course = A.Course and M.StudNum = R.StudNum
+group by M.StudNum
