@@ -1,20 +1,63 @@
 WITH A AS (
-SELECT cid_num, crs_cust_ig, row_number() over (partition by cid_num order by obs_month) as Months, 
-CASE WHEN crs_cust_ig BETWEEN 60 and 65 then '60-65' 
-	WHEN crs_cust_ig BETWEEN 70 and 77 then '70-77'
-	WHEN crs_cust_ig BETWEEN 80 and 87 then '80-87'
-	WHEN crs_cust_ig >= 90 then '90+'
-	ELSE 'Other' 
-END AS IG_Bucket 
-FROM [GRMSMB].[LNDZ].[can_sb_all] A
-where crs_cust_ig is not null and crs_cust_ig not in (1,0)
+    SELECT 
+        cid_num, 
+        crs_cust_ig, 
+        obs_month,
+        row_number() OVER (PARTITION BY cid_num ORDER BY obs_month) AS Months, 
+        CASE 
+            WHEN crs_cust_ig BETWEEN 60 AND 65 THEN '60-65' 
+            WHEN crs_cust_ig BETWEEN 70 AND 77 THEN '70-77'
+            WHEN crs_cust_ig BETWEEN 80 AND 87 THEN '80-87'
+            WHEN crs_cust_ig >= 90 THEN '90+'
+            ELSE 'Other' 
+        END AS IG_Bucket,
+        LAG(crs_cust_ig) OVER (PARTITION BY cid_num ORDER BY obs_month) AS Prev_crs_cust_ig,
+        LAG(
+            CASE 
+                WHEN crs_cust_ig BETWEEN 60 AND 65 THEN '60-65' 
+                WHEN crs_cust_ig BETWEEN 70 AND 77 THEN '70-77'
+                WHEN crs_cust_ig BETWEEN 80 AND 87 THEN '80-87'
+                WHEN crs_cust_ig >= 90 THEN '90+'
+                ELSE 'Other' 
+            END
+        ) OVER (PARTITION BY cid_num ORDER BY obs_month) AS Prev_IG_Bucket
+    FROM [GRMSMB].[LNDZ].[can_sb_all] A
+    WHERE crs_cust_ig IS NOT NULL AND crs_cust_ig NOT IN (1,0)
 ),
 B AS (
-SELECT DISTINCT cid_num, crs_cust_ig, industry, province, city_nm, product_type
-FROM [GRMSMB].[LNDZ].[can_sb_all] A
-WHERE obs_month = 202501
-)  
-SELECT A.cid_num, A.crs_cust_ig, A.Months, A.IG_Bucket, 
-B.industry,B.province, B.city_nm, B.product_type
-FROM A inner join B ON a.cid_num = b.cid_num
-WHERE Months in (1,3,6,9,12,15,18)
+    SELECT DISTINCT 
+        cid_num, 
+        crs_cust_ig, 
+        industry, 
+        province, 
+        city_nm, 
+        product_type
+    FROM [GRMSMB].[LNDZ].[can_sb_all] A
+    WHERE obs_month = 202501
+)
+SELECT 
+    A.cid_num, 
+    A.crs_cust_ig, 
+    A.Months, 
+    A.IG_Bucket, 
+    B.industry, 
+    B.province, 
+    B.city_nm, 
+    B.product_type,
+    CASE 
+        WHEN A.Prev_IG_Bucket IS NULL THEN 'New' -- If there’s no previous record, mark as "New"
+        WHEN A.IG_Bucket <> A.Prev_IG_Bucket THEN 
+            CASE 
+                WHEN crs_cust_ig > Prev_crs_cust_ig THEN 'Upgrade' 
+                ELSE 'Downgrade' 
+            END
+        WHEN A.IG_Bucket = A.Prev_IG_Bucket THEN 
+            CASE 
+                WHEN crs_cust_ig > Prev_crs_cust_ig THEN 'Slight Upgrade' 
+                WHEN crs_cust_ig < Prev_crs_cust_ig THEN 'Slight Downgrade' 
+                ELSE 'Same' 
+            END
+    END AS migrate
+FROM A 
+INNER JOIN B ON A.cid_num = B.cid_num
+WHERE Months IN (1,3,6,9,12,15,18);
