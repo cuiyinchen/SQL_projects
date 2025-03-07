@@ -1,0 +1,20 @@
+WITH A AS (
+SELECT cid_num, crs_cust_ig, row_number() over (partition by cid_num order by obs_month) as Months, 
+CASE WHEN crs_cust_ig BETWEEN 60 and 65 then '60-65' 
+	WHEN crs_cust_ig BETWEEN 70 and 77 then '70-77'
+	WHEN crs_cust_ig BETWEEN 80 and 87 then '80-87'
+	WHEN crs_cust_ig >= 90 then '90+'
+	ELSE 'Other' 
+END AS IG_Bucket 
+FROM [GRMSMB].[LNDZ].[can_sb_all] A
+where crs_cust_ig is not null and crs_cust_ig not in (1,0)
+),
+B AS (
+SELECT DISTINCT cid_num, crs_cust_ig, industry, province, city_nm, product_type
+FROM [GRMSMB].[LNDZ].[can_sb_all] A
+WHERE obs_month = 202501
+)  
+SELECT A.cid_num, A.crs_cust_ig, A.Months, A.IG_Bucket, 
+B.industry,B.province, B.city_nm, B.product_type
+FROM A inner join B ON a.cid_num = b.cid_num
+WHERE Months in (1,3,6,9,12,15,18)
