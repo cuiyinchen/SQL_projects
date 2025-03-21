@@ -1,0 +1,27 @@
+ -- list of customers with crs ig for obs_month 202502, 
+--how many have valid crs ig within the bucket;
+--how many have invalid crs ig;
+--how many have null crs ig 
+
+WITH A AS(
+SELECT DISTINCT cid_num, crs_cust_ig, obs_month, open_month,
+
+	case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					  	
+    end as IG_Bucket
+
+	case 
+		when crs_cust_ig is null then 
+
+FROM [GRMSMB].[LNDZ].[can_sb_all] 
+WHERE obs_month = 202502 
+)
+
+SELECT A.*, 
+	case 
+		when A.IG_Bucket = 'Other'  then 'Invalid IG'
+		else 'Valid IG'
+	end	as IG_Status
