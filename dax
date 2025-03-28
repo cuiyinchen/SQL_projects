@@ -1,0 +1,17 @@
+downgrade_std = 
+VAR MonthTable =
+    SUMMARIZE(
+        ig_crs_migration,
+        ig_crs_migration[Month],
+        "downgrade_pct", 
+            CALCULATE(
+                COUNT(ig_crs_migration[cid_num]),
+                ig_crs_migration[ig_migration] = "downgrade"
+            ) 
+            /
+            CALCULATE(
+                COUNT(ig_crs_migration[cid_num])
+            )
+    )
+RETURN
+    STDEVX.S(MonthTable, [downgrade_pct])
