@@ -1,0 +1,121 @@
+-- (TASK 1.5) Pull and integrate Q/Q for: 
+--   25Q1 (Jan25 & Oct24), 24Q4 (Oct24 & Jul24), 24Q3 (Jul24 & Apr24), 24Q2 (Apr24 & Jan24)
+ 
+ -- T1: Previous Oct24, Current Jan25
+  
+WITH P AS (
+ select distinct cid_num, crs_cust_ig,
+		case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					
+        end as IG_Bucket_Previous_Oct24
+ from [GRMSMB].[LNDZ].[can_sb_all]
+ where obs_month = 202410 and crs_cust_ig is not null
+ ),
+C AS (
+select distinct cid_num, crs_cust_ig,
+		case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					
+        end as IG_Bucket_Current_Jan25
+ from [GRMSMB].[LNDZ].[can_sb_all]  
+ where obs_month = 202501 and crs_cust_ig is not null
+ )
+ select P.cid_num, P.crs_cust_ig, P.IG_Bucket_Previous_Oct24, C.IG_Bucket_Current_Jan25
+ from P inner join C 
+ on P.cid_num = C.cid_num
+ where P.IG_Bucket_Previous_Oct24 <> 'Other' and C.IG_Bucket_Current_Jan25 <> 'Other'
+
+
+ -- T2: Previous Jul24, Current Oct24
+
+WITH P AS (
+ select distinct cid_num, crs_cust_ig,
+		case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					
+        end as IG_Bucket_Previous_Jul24
+ from [GRMSMB].[LNDZ].[can_sb_all]
+ where obs_month = 202407 and crs_cust_ig is not null
+ ),
+C AS (
+select distinct cid_num, crs_cust_ig,
+		case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					
+        end as IG_Bucket_Current_Oct24
+ from [GRMSMB].[LNDZ].[can_sb_all]  
+ where obs_month = 202410 and crs_cust_ig is not null
+ )
+ select P.cid_num, P.crs_cust_ig, P.IG_Bucket_Previous_Jul24, C.IG_Bucket_Current_Oct24
+ from P inner join C 
+ on P.cid_num = C.cid_num
+ where P.IG_Bucket_Previous_Jul24 <> 'Other' and C.IG_Bucket_Current_Oct24 <> 'Other'
+
+
+ -- T3: Previous Apr24, Current Jul24
+
+WITH P AS (
+ select distinct cid_num, crs_cust_ig,
+		case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					
+        end as IG_Bucket_Previous_Apr24
+ from [GRMSMB].[LNDZ].[can_sb_all]
+ where obs_month = 202404 and crs_cust_ig is not null
+ ),
+C AS (
+select distinct cid_num, crs_cust_ig,
+		case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					
+        end as IG_Bucket_Current_Jul24
+ from [GRMSMB].[LNDZ].[can_sb_all]  
+ where obs_month = 202407 and crs_cust_ig is not null
+ )
+ select P.cid_num, P.crs_cust_ig, P.IG_Bucket_Previous_Apr24, C.IG_Bucket_Current_Jul24
+ from P inner join C 
+ on P.cid_num = C.cid_num
+ where P.IG_Bucket_Previous_Apr24 <> 'Other' and C.IG_Bucket_Current_Jul24 <> 'Other'
+ 
+
+ -- T4: Previous Jan24, Current Apr24
+
+WITH P AS (
+ select distinct cid_num, crs_cust_ig,
+		case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					
+        end as IG_Bucket_Previous_Jan24
+ from [GRMSMB].[LNDZ].[can_sb_all]
+ where obs_month = 202401 and crs_cust_ig is not null
+ ),
+C AS (
+select distinct cid_num, crs_cust_ig,
+		case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					
+        end as IG_Bucket_Current_Apr24
+ from [GRMSMB].[LNDZ].[can_sb_all]  
+ where obs_month = 202404 and crs_cust_ig is not null
+ )
+ select P.cid_num, P.crs_cust_ig, P.IG_Bucket_Previous_Jan24, C.IG_Bucket_Current_Apr24
+ from P inner join C 
+ on P.cid_num = C.cid_num
+ where P.IG_Bucket_Previous_Jan24 <> 'Other' and C.IG_Bucket_Current_Apr24 <> 'Other'
