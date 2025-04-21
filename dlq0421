@@ -1,0 +1,142 @@
+/*****************************************/
+/*** GET DELINQUENCY DAYS CODE ***********/
+/*****************************************/
+data delinquency_&yyyymm._1;
+	set security_&yyyymm._4;
+
+*~~~ calculating data dates ~~~;
+	format
+		dd_calc_date date9.
+		bl_calc_date date9.
+	;
+	if missing(dd_process_date) then dd_calc_date = obs_date;
+	else dd_calc_date = dd_process_date;
+	if missing(bl_process_date) then bl_calc_date = obs_date;
+	else bl_calc_date = bl_process_date;
+
+*~~~ renaming dda variables ~~~;
+	dda_sbl_flag = mo_odl_flag;
+	dda_days_overdraw = mo_odl_num_days_od; * number of consecutive days A/C overdrawn, C/A and SCA, reset to 0 when O/D covered ;
+	dda_days_delinquent = mo_days_delinquent; * number of days delinquent - only for product where this calculation applies ;
+
+*~~~ calculating dda variables ~~~;
+	format oll_next_due_date date9.;
+	if missing(ic_ln_next_due_date) then;
+	else if ic_ln_next_due_date = 0 then;
+	else do;
+		y_temp = 2000+mod(ic_ln_next_due_date, 100);
+		m_temp = floor(ic_ln_next_due_date / 10000);
+		d_temp = floor(mod(ic_ln_next_due_date, 10000) / 100);
+		oll_next_due_date = mdy(m_temp, d_temp, y_temp);
+	end;
+
+	format oll_days_from_next_due 5.;
+	if missing(oll_next_due_date) then oll_days_from_next_due = 0;
+	else oll_days_from_next_due = intck('day', oll_next_due_date, bl_calc_date);
+	if oll_days_from_next_due < 0 then oll_days_from_next_due = 0;
+
+	format oll_last_pay_date date9.;
+	if missing(ic_ln_last_pay_date) then;
+	else if ic_ln_last_pay_date = 0 then;
+	else do;
+		y_temp = mod(ic_ln_last_pay_date, 100);
+		m_temp = floor(ic_ln_last_pay_date / 10000);
+		d_temp = floor(mod(ic_ln_last_pay_date, 10000) / 100);
+		oll_last_pay_date = mdy(m_temp, d_temp, y_temp);
+	end;
+	drop y_temp m_temp d_temp;
+
+	format oll_days_since_last_pay 5.;
+	if missing(oll_last_pay_date) then oll_days_since_last_pay = intck('day', open_date, bl_calc_date);
+	else oll_days_since_last_pay = intck('day', oll_last_pay_date, bl_calc_date);
+	if missing(oll_days_since_last_pay) then oll_days_since_last_pay = 0;
+
+*~~~ manually calculated delinquency days ~~~;
+	if source = 'SL' then dpd_manual = day_pst_due;
+	else if source in ('KS', 'KQ', 'KQ_TSYS') then dpd_manual = day_pst_due - 30;
+	else if product_type = 'SPSP' then dpd_manual = day_pst_due - 30;
+	else if source = 'BL' then do;
+		if ic_ln_ref_code in ("PA01","PC95", "PC38") then dpd_manual = oll_days_since_last_pay - 90;
+		else if oll_days_from_next_due < day_pst_due then dpd_manual = day_pst_due;
+		else dpd_manual = oll_days_from_next_due;
+	end;
+	else if source = 'DD' then do; 
+		if dda_sbl_flag in (3, 5, 8) then dpd_manual = dda_days_delinquent -30;
+		else if dda_sbl_flag in (1, 4, 7) then dpd_manual = dda_days_overdraw - 30;
+		else if dda_sbl_flag in (2) then do;
+			if missing(mo_lst_dep_date) then mo_lst_dep_date = open_date;
+			days_since_last_deposit = intck('day', mo_lst_dep_date, dd_calc_date);
+
+			if missing(dda_days_overdraw) then dpd_manual = 0;
+			else if missing(days_since_last_deposit) then dpd_manual = 0;
+			else dpd_manual = min(of dda_days_overdraw, days_since_last_deposit) - 365; 
+		end;
+		else if dda_sbl_flag in (0) then dpd_manual = dda_days_overdraw - 15;
+	end;
+	
+	if dpd_manual < 0 then dpd_manual = 0;
+	if missing(dpd_manual) then dpd_manual = 0;
+
+*~~~ prod_rcrr1 calculated delinquency days ~~~;
+	if source in ('KQ', 'KS', 'KQ_TSYS') or product_type = 'SPSP' then dpd_system = day_pst_due - 30;
+	else dpd_system = day_pst_due;
+
+	if dpd_system < 0 then dpd = 0;
+	if missing(dpd_system) then dpd = 0;
+
+*~~~ use the manually calculated days before 999999 (until edl is updated) ~~~;
+	if obs_month < 999999 then dpd = dpd_manual;
+	
+*~~~ if os is negative then set dpd to 0 ~~~;
+	if os_bal <= 0 then do;
+		dpd = 0;
+		dpd_manual = 0;
+	end;
+
+*~~~ create delinquency buckets ~~~;
+	if source = 'DD' and dda_sbl_flag in (3, 5, 8) then do;
+		if 26 <= dpd <= 30 then dpd_temp = 31;
+		else if 86 <= dpd <= 90 then dpd_temp = 91;
+		else dpd_temp = dpd;
+	end;
+	else dpd_temp = dpd; 
+
+	if not missing(nal_status) and nal_status ^= 'Performing (Not NAL)' then do;
+		 Unit31p = 1;
+		 Bal31p = OS_bal;
+		 Unit91p = 1;
+		 Bal91p = OS_bal;
+	end;
+	else if dpd_temp <= 30 then do;
+		 Unit31p = 0;
+		 Bal31p = 0;
+		 Unit91p = 0;
+		 Bal91p = 0;
+	end;
+	else if dpd_temp <= 90 then do;
+		 Unit31p = 1;
+		 Bal31p = OS_bal;
+		 Unit91p = 0;
+		 Bal91p = 0;
+	end;
+	else if dpd_temp > 90 then do;
+		 Unit31p = 1;
+		 Bal31p = OS_bal;
+		 Unit91p = 1;
+		 Bal91p = OS_bal;
+	end;
+	
+	if missing(nal_status) then do;
+		NAL_unit = 0;
+		NAL_bal = 0; 
+	end;
+	else if nal_status = 'Performing (Not NAL)' then do;
+		NAL_unit = 0;
+		NAL_bal = 0; 
+	end;
+	else do;
+		NAL_unit = 1;
+		NAL_bal = os_bal;
+	end;
+
+run;
