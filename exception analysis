@@ -1,0 +1,940 @@
+*%include "C:\temp\SAS_Program.sas"; /*this line establishes connections to the IW608 server containing the code commented out below*/
+
+*%include "C:\temp\SAS_Libraries.sas"; /*** include link to where libraries saved***/
+
+libname path 'R:\Data\retail lending\Small Business Risk\Small Business Originations\Exception';
+
+%Let Report_path = M:\Data\Small Business Risk\Portfolio Management\06 - Policy_Programs\07 - ACE Exception Authority Document\Quarterly Exception Report\Exception Monitoring Development;
+
+
+/*libname swx 'R:\Data\retail lending\Small Business Risk\Common\I-Mate\Canada\Canada Originations\Data\202002';*/
+
+%let mth=%sysfunc(intnx(month, %sysfunc(today()), -1),MonYY5.); rsubmit; %let mth=%sysfunc(intnx(month, %sysfunc(today()), -1),MonYY5.); endrsubmit;
+%let mth_1=%sysfunc(intnx(month, %sysfunc(today()), -2),MonYY5.); rsubmit; %let mth_1=%sysfunc(intnx(month, %sysfunc(today()), -2),MonYY5.); endrsubmit;
+%put &mth. &mth_1.; rsubmit; %put &mth. &mth_1.; endrsubmit;
+
+
+%let folder = Jan25;	  /*** Entere new months file name****/
+%let curdate = 20250218;
+
+
+
+RSUBMIT; 
+libname RWORK "%sysfunc(pathname(work))" ; 
+ENDRSUBMIT; 
+libname rwork slibref=rwork server=mynode;
+
+Rsubmit; libname swsbo     '/sasdata/risk/SBO/SW_SBO_REPORTS'; endrsubmit; libname swsbo slibref=swsbo server=mynode;
+
+
+/*import initial exception data - update to ensure path name is correct - this file is for low-side override (e.g. Decline to Approve*/
+proc import
+	datafile = "R:\Data\retail lending\Small Business Risk\Small Business Originations\Exception\&folder\exception_results.xlsx"
+	dbms = xlsx
+	out = outcome_messages
+	replace;
+	getnames = yes;
+	/*sheet="Log";*/
+	range = "results$A1:0";
+run;
+
+/*import initial exception data - update to ensure path name is correct - this file is to capture if manual approval results in higher approved amount than system approval*/
+proc import
+	datafile = "R:\Data\retail lending\Small Business Risk\Small Business Originations\Exception\&folder\newexception.xlsx"
+	dbms = xlsx
+	out = results
+	replace;
+	getnames = yes;
+	/*sheet="Log";*/
+	range = "results$A1:0";
+run;
+/*
+proc freq data=results;
+tables manual_decision;
+run;
+*/
+data results2;
+set results;
+if system_decision='A' and manual_decision='A';
+if manual_amount_approved>system_amount_approved then limitexcep=1; else limitexcep=0;
+if primary_override_reason in (500006,500010,500004,500003,500014,500007,500002,500011,500008);
+run;
+proc freq data=results2;
+tables decision_month*limitexcep;
+run;
+
+/*** GETTING DECLINE REASON INFO ***/
+data decline_reason_1;
+	set outcome_messages;
+	process_date=var9;
+	drop var9;
+	where parent_outcome_type = "DM";
+run;
+
+/*data test;*/
+/*set outcome_messages;*/
+/*if APP_ID in (2109262) and APP_PRODUCT_ID=4294189 and var9=20191101;*/
+/*run;*/
+proc contents data=decline_reason_1; run;
+
+data decline_reason_2;
+	set decline_reason_1;
+
+	length decline_category $30.;
+	if outcome_code in ('330018', '101', '103', '330017', '102', '710', '350', '211', '11', '330003', '330015', '212b', '350b', '105', '104', '212') then do;
+		decline_priority = 1;
+		decline_category = 'Performance';
+	end;
+	else if outcome_code in ('213', '330001', '330004', '330101', '330005', '330014') then do;
+		decline_priority = 2;
+		decline_category = 'Capacity';
+	end;
+	else if outcome_code in ('217', '218') then do;
+		decline_priority = 3;
+		decline_category = 'Security';
+	end;
+	else if outcome_code in ('12', '2', '21', '804', '809', '803', '330007', '330012', '205', '15', '805') then do;
+		decline_priority = 4;
+		decline_category = 'Requirements';
+	end;
+	else if outcome_code in ('202', '204', '203', '209', '208') then do;
+		decline_priority = 5;
+		decline_category = 'Limit';
+	end;
+	else if outcome_code in ('330002', '330013', '810', '806') then do;
+		decline_priority = 6;
+		decline_category = 'Documentation/Condition';
+	end;
+	else do;
+		decline_priority = 9;
+		decline_category = 'Other';
+	end;
+run;
+
+data decline_all;
+	set decline_reason_2;
+run;
+
+/* summarizing decline reason by facility */
+proc sort data = decline_reason_2 out = facility_decline_1;
+	by app_id app_product_id descending decline_priority;
+run;
+
+data facility_decline_2;
+	set facility_decline_1;
+	by app_id app_product_id;
+	
+	rename decline_category = primary_decline_category;
+
+	retain
+		decline_performance
+		decline_capacity
+		decline_security
+		decline_requirement
+		decline_limit
+		decline_documentation
+		decline_other
+	;
+
+	if first.app_product_id then do;
+		decline_performance = 0;
+		decline_capacity = 0;
+		decline_security = 0;
+		decline_requirement = 0;
+		decline_limit = 0;
+		decline_documentation = 0;
+		decline_other = 0;
+	end;
+
+	if decline_priority = 1 then decline_performance = 1;
+	else if decline_priority = 2 then decline_capacity = 1;
+	else if decline_priority = 3 then decline_security = 1;
+	else if decline_priority = 4 then decline_requirement = 1;
+	else if decline_priority = 5 then decline_limit = 1;
+	else if decline_priority = 6 then decline_documentation = 1;
+	else if decline_priority = 9 then decline_other = 1;
+
+	if last.app_product_id then output;
+
+run;
+proc sort data=facility_decline_2 out=z nodupkey;
+by app_product_id;
+run;
+
+data facility_decline (rename=(outcome_code=decline_code));
+	set facility_decline_2;
+	keep
+		app_id app_product_id
+		outcome_code
+		primary_decline_category
+		decline_performance
+		decline_capacity
+		decline_security
+		decline_requirement
+		decline_limit
+		decline_documentation
+		decline_other
+	;
+run;
+
+/* summarizing decline reason by application */
+proc sort data = decline_reason_2 out = app_decline_1;
+	by app_id descending decline_priority;
+run;
+
+
+
+data app_decline_2;
+	set app_decline_1;
+	by app_id;
+	
+	rename decline_category = appl_primary_decline_category;
+
+	retain
+		appl_decline_performance
+		appl_decline_capacity
+		appl_decline_security
+		appl_decline_requirement
+		appl_decline_limit
+		appl_decline_documentation
+		appl_decline_other
+	;
+
+	if first.app_id then do;
+		appl_decline_performance = 0;
+		appl_decline_capacity = 0;
+		appl_decline_security = 0;
+		appl_decline_requirement = 0;
+		appl_decline_limit = 0;
+		appl_decline_documentation = 0;
+		appl_decline_other = 0;
+	end;
+
+	if decline_priority = 1 then appl_decline_performance = 1;
+	else if decline_priority = 2 then appl_decline_capacity = 1;
+	else if decline_priority = 3 then appl_decline_security = 1;
+	else if decline_priority = 4 then appl_decline_requirement = 1;
+	else if decline_priority = 5 then appl_decline_limit = 1;
+	else if decline_priority = 6 then appl_decline_documentation = 1;
+	else if decline_priority = 9 then appl_decline_other = 1;
+
+	if last.app_id then output;
+run;
+/*
+data test3;
+set app_decline_2;
+if APP_ID in (2109262);
+run;
+*/
+data app_decline;
+	set app_decline_2;
+	keep
+		app_id
+		appl_primary_decline_category
+		appl_decline_performance
+		appl_decline_capacity
+		appl_decline_security
+		appl_decline_requirement
+		appl_decline_limit
+		appl_decline_documentation
+		appl_decline_other
+	;
+run;
+
+proc delete data = decline_reason_1; run;
+proc delete data = decline_reason_2; run;
+proc delete data = facility_decline_1; run;
+proc delete data = facility_decline_2; run;
+proc delete data = app_decline_1; run;
+proc delete data = app_decline_2; run;
+
+data test;
+set app_decline;
+if APP_ID in (2110822);
+run;
+
+data test2;
+set outcome_messages;
+if APP_ID in (2110822);
+run;
+
+/*override code*/
+/*** GETTING EXCEPTION INFO ***/
+data exception_1;
+	set outcome_messages;
+	/*where parent_outcome_type = "OVR";*/
+run;
+
+data exception_2;
+	set exception_1;
+
+	length exception_reason $100. exception_type $2.;
+	if outcome_code in ('400001') then do;
+		exception_reason = 'Unsatisfactory BNS relationship.';
+		exception_type = "HS";
+	end;
+	else if outcome_code in ('500001') then do;
+		exception_reason = 'Capacity Established per Standard Guidelines (Re-work).';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('400002') then do;
+		exception_reason = 'Exceeds unsecured lending limit."';
+		exception_type = "HS";
+	end;
+	else if outcome_code in ('500012') then do;
+		exception_reason = 'Qualify with Standard Policies.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('400003') then do;
+		exception_reason = 'Inability to service loan.';
+		exception_type = "HS";
+	end;
+	else if outcome_code in ('500002') then do;
+		exception_reason = 'Relationship.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('500003') then do;
+		exception_reason = 'Isolated/Temporary credit issues accepted – Business Owner.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('400004') then do;
+		exception_reason = 'Environmental risk factors.';
+		exception_type = "HS";
+	end;
+	else if outcome_code in ('500004') then do;
+		exception_reason = 'Isolated/ Temporary credit issues accepted – Business.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('400005') then do;
+		exception_reason = "Does not qualify for Gov't Guarantee.";
+		exception_type = "HS";
+	end;
+	else if outcome_code in ('500005') then do;
+		exception_reason = 'Security RRS/RRE/CRE.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('400006') then do;
+		exception_reason = 'Unsatisfactory information about business and/or owners.';
+		exception_type = "HS";
+	end;
+	else if outcome_code in ('500006') then do;
+		exception_reason = 'Security RRS/RRE/CRE.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('500101', '500120') then do;
+		exception_reason = 'Other';
+		exception_type = "HS";
+	end;
+	else if outcome_code in ('500007') then do;
+		exception_reason = 'Significant Net Worth – Business Owner."';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('500008') then do;
+		exception_reason = 'Third Party Guarantor Added.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('500009') then do;
+		exception_reason = 'Qualify for Government Guaranteed Programs.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('500010') then do;
+		exception_reason = 'Shore-up BNS debt.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('500011') then do;
+		exception_reason = 'Strong Credit History.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('500013') then do;
+		exception_reason = 'Customer has acceptable net worth (TNW).';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('500014') then do;
+		exception_reason = 'Non Standard Capacity Established.';
+		exception_type = "LS";
+	end;
+	else if outcome_code in ('500100') then do;
+		exception_reason = 'Qualify for SPSP Program.';
+		exception_type = "LS";
+	end;
+	else do;
+		exception_reason = 'N/A';
+		exception_type = "NN";
+	end;
+run;
+
+data exception_all;
+	set exception_2;
+run;
+
+/* summarizing exception reason by facility */
+proc sort data = exception_2 out = facility_exception_1;
+	by app_id app_product_id primary;
+run;
+
+data facility_exception_2;
+	set facility_exception_1;
+	by app_id app_product_id;
+	
+	rename
+		exception_reason = primary_exception_reason
+		exception_type = primary_exception_type
+	;
+
+	retain
+		high_side_exception
+		low_side_exception
+	;
+
+	if first.app_product_id then do;
+		high_side_exception = 0;
+		low_side_exception = 0;
+	end;
+	
+	if exception_type = "HS" then high_side_exception = 1;
+	else if exception_type = "LS" then low_side_exception = 1;
+
+	if last.app_product_id then output;
+
+run;
+
+data facility_exception (rename=(outcome_code=override_code));
+	set facility_exception_2;
+	keep
+		app_id app_product_id
+		primary_exception_reason
+		primary_exception_type
+		outcome_code
+		high_side_exception
+		low_side_exception
+	;
+run;
+
+/* summarizing exception reason by application */
+data app_exception_1;
+	set facility_exception_1;
+	by app_id;
+
+	retain
+		appl_high_side_exception
+		appl_low_side_exception
+	;
+
+	if first.app_id then do;
+		appl_high_side_exception = 0;
+		appl_low_side_exception = 0;
+	end;
+
+	if exception_type = "HS" then appl_high_side_exception = 1;
+	else if exception_type = "LS" then appl_low_side_exception = 1;
+
+	if last.app_id then output;
+
+run;
+
+data app_exception;
+	set app_exception_1;
+	keep
+		app_id
+		appl_high_side_exception
+		appl_low_side_exception
+	;
+run;
+
+proc delete data = exception_1; run;
+proc delete data = exception_2; run;
+proc delete data = facility_exception_1; run;
+proc delete data = facility_exception_2; run;
+proc delete data = app_exception_1; run;
+
+/*test to see override code*/
+proc freq data=path.exceptionfacility;
+tables override_code;
+run;
+
+proc sort data=facility_decline;
+by app_id app_product_id;
+run;
+proc sort data=facility_exception;
+by app_id app_product_id;
+run;
+data path.exceptionfacility;
+merge facility_decline (in=a) facility_exception (in=b);
+by app_id app_product_id;
+if a and b;
+run;
+
+/*proc contents data=swsbo.Sb_sw_mthly_rpt; run;*/
+
+rsubmit;
+data rwork.sw;
+set swsbo.sb_sw_mthly_rpt;
+app_id=input(application_num,30.);
+app_product_id=input(application_num_seq,30.);
+run;
+endrsubmit;
+rsubmit;
+proc freq data=rwork.sw;
+tables primary_reason_ind;
+run;
+endrsubmit;
+
+rsubmit;
+proc sort data=rwork.sw;
+by app_id app_product_id;
+run;
+endrsubmit;
+proc sort data=path.exceptionfacility;
+by app_id app_product_id;
+run;
+proc freq data=rwork.sw;
+tables excptn_apprv_ind;
+run;
+
+proc sql;
+create table exception as
+select
+a.*,
+b.*
+from path.exceptionfacility a inner join rwork.sw b
+on a.app_id=b.app_id and a.app_product_id=b.app_product_id;
+/*where /*b.product_name not in ('SCOTIA PROF. STUDENT PLAN') and b.exception_flag='Y' ;*/
+quit;
+
+proc sort data=exception out=exception nodupkey;
+by app_id app_product_id dcsn_dt_mth decline_code;
+run;
+
+/*need to export this to excel manually to extract applications for capacity calculator*/
+data exception7;
+set exception;
+format decline_code $10.;
+/*cannot condition for 350b so rename as 350*/
+if compress(decline_code)='350b' then decline_code='350';
+if compress(decline_code)='212b' then decline_code='212';
+where primary_exception_type='LS' and OVERRIDE_CODE IN ('500002','500003','500004','500006','500007','500008','500010','500011','500014');
+run;
+
+data i;
+set exception;
+if decline_code='213';
+run;
+proc sort data=i nodupkey;
+by app_id;
+run;
+
+data o;
+set exception7;
+if app_id in (2099430);
+run;
+proc contents data=exception7; run;
+proc freq data=exception7; tables prd_cd; run;
+proc freq data=exception7; tables security_edl; run;
+
+proc freq data=exception7;
+tables score_ig_cd;
+run;
+
+proc export
+	data = exception7
+	dbms = xlsx
+	outfile="R:\Data\retail lending\Small Business Risk\Small Business Originations\Exception\Exception before prioritization.xlsx"
+	replace;
+	sheet="Data";
+run;
+
+
+/*once you get the app numbers from capacity calculator in excel file above and code 213 for current month, copy and paste required apps from the capicity calculator excel into the program below*/
+/*this program simulated the exception logic that ACE is doing*/
+data exception8;
+set exception7;
+format security_type $30.;
+    if compress(security_edl) in ('2-4 unit rental building','Cottage or leisure home','Farm Real Estate','Farm Real Estate - Land Only','Single family dwelling','Condominium','Letter of Opinion') then security_type='RRE';
+	else if compress(security_edl) in ('Life Insurance CSV','Mutual Funds','Scotiabank deposit account','Scotiabank Non-redeemable GIC','Scotiabank Redeemable GIC') then security_type='RRS';
+	else if compress(security_edl) in ('Commercial RE','Mixed Use Properties') then security_type='Commercial RE';
+	else if compress(security_edl) in ('GSA','GSA - Insurance Waived','Inventory','Notice of Livestock Security','Section 427','Section 427 - Insurance Waived') then security_type='GSA';
+	else if compress(security_edl) in ('Equipment') then security_type='Machinery and Equipment';
+	else if compress(security_edl) in ('Business Creditor Life Insurance','Comfort Letter','Farm Quota','Postponement Agreement','Priority Agreement','Subordination Agreement') then security_type='Other Security';
+	else security_type='Unsecured';
+/*SPP SIC CODES if business_sic_cd in ('8653', '8654', '8651', '8652', '0211') then program = 'SPP Tier 1';
+else if business_sic_cd in ('7739', '7731', '7761', '8666', '6031') then program = 'SPP Tier 2';*/
+
+/*NON SPSP ONLY*/
+format decline_code2 $15.;
+if prd_cd not in ('LRSPSP') then do;
+if compress(decline_code)='203' then do;
+if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=1 then decline_code2='203';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=75 and aprvd_amt>0 then decline_code2='203';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=77 and aprvd_amt>100000 then decline_code2='203';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd) in (80,83,85) and aprvd_amt>250000 then decline_code2='203';
+end;
+/*As discussed with Ross; changed from SB UPmarket limit to regular limit*/
+if compress(decline_code)='208' then do;
+if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=1 then decline_code2='208';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=75 and aprvd_amt>0 then decline_code2='208';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=77 and aprvd_amt>100000 then decline_code2='208';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd) in (80,83,85) and aprvd_amt>250000 then decline_code2='208';
+end; 
+
+/*After discussed with Ross*/
+/*if compress(decline_code)='350' then do;
+if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=1 then decline_code2='350';
+end;*/
+
+if decline_code in ('810') then decline_code2='';
+if decline_code in ('217') then decline_code2='';
+if decline_code in ('806') then decline_code2='';
+if decline_code in ('330122') then decline_code2='';
+if decline_code in ('809') then decline_code2='';
+if decline_code='218' then do;
+if security_type not in ('RRS.','RRE.','Commercial RE.') then decline_code2='218';
+else if product not in ('CREDIT CARDS','LINE/ODF') then decline_code2='218';
+end;
+
+if decline_code='804' then do;
+if compress(business_sic_cd) in (9211, 9212, 9213, 9221, 9214, 9229) then decline_code2='804';
+end;
+
+if compress(decline_code)='209' then do;
+if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=1 then decline_code2='209';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=75 and aprvd_amt>300000 then decline_code2='209';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=77 and aprvd_amt>500000 then decline_code2='209';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd) in (80,83,85) and aprvd_amt>1000000 then decline_code2='209';
+end;
+if decline_code='672' then decline_code2='';
+if decline_code='330005' then decline_code2='';
+if decline_code='330014' then decline_code2='';
+if decline_code='219' then decline_code2='';
+if decline_code='330100' then decline_code2='';
+/*if business_sic_cd in ('9211', '9212', '9213', '9214', '9221', '9229', '4561','4562','4563','4564','4565','4569') */
+/*and year_biz_since<2 then decline_code2='803';*/
+if decline_code='803' then decline_code2='';
+/*if compress(security_type) in ('RRS.','RRE.','Commercial RE.') then decline_code2='';*/
+
+/*if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') then it is not an exception for decline code 803 - to amend*/
+
+/*If SPP then not exception or total approved is >$250K for revolving products (cards, lines, odf) then exception - amend 212
+, total approved is >$500K for non-revolving products then not exception - amend 212
+If security type in ('RRS.','RRE.','Commercial RE.') then not exception - amend 212*/
+if decline_code='212' then do;
+if business_sic_cd in ('8653','8654','8651','8652','0211','7739','7731','7761','8666','6031') then decline_code2='';
+else if aprvd_amt>250000 and product in ('CREDIT CARDS','LINE/ODF') then decline_code2='212';
+else if aprvd_amt>500000 and product not in ('CREDIT CARDS','LINE/ODF') then decline_code2='212';
+else if security_type in ('RRS.','RRE.','Commercial RE.') then decline_code2='';
+end;
+
+/*if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=1 and product in ('CREDIT CARDS','LINE/ODF') then decline_code2='212';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=75 and product in ('CREDIT CARDS','LINE/ODF') and aprvd_amt>300000 then decline_code2='212';
+else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=75 and product not in ('CREDIT CARDS','LINE/ODF') then decline_code2='212';
+end;*/
+if decline_code='805' then decline_code2=''; /*check with Timothy*/
+if decline_code='11' then decline_code2=''; /*check with Timothy*/
+if decline_code='330013' then decline_code2='';
+if decline_code='330001' then decline_code2='';
+if decline_code='330014' then decline_code2='';
+if decline_code='330101' then decline_code2='';
+if decline_code='330005' then decline_code2='';
+if decline_code='407' then decline_code2='';
+if decline_code='330016' then decline_code2='';
+if decline_code='330101' then decline_code2='';
+if decline_code='330004' then decline_code2='';
+if decline_code='330005' then decline_code2='';
+if decline_code='330006' then decline_code2='';
+if decline_code='205' then decline_code2='';
+if decline_code='330019' then decline_code2='';
+/*if decline_code='403' then decline_code2='';*/
+if decline_code='330015' then decline_code2='';
+/*if decline_code='407' then decline_code2='';*/
+if decline_code='330012' then decline_code2='';
+if decline_code='330002' then decline_code2='';
+if decline_code='404' then decline_code2='';
+if decline_code='330004' then decline_code2='';
+/*if decline_code='204' then do;*/
+/*if compress(security_type) not in ('RRS.','RRE.','Commercial RE.','General.') and then decline_code2='204';*/
+/*end;*/
+if decline_code='202' then do;
+/*Below criteria only applies for Non SPP, all SPP will not be an exception - amend 202*/
+if business_sic_cd in ('8653','8654','8651','8652','0211','7739','7731','7761','8666','6031') then decline_code2='';
+if business_sic_cd not in ('8653','8654','8651','8652','0211','7739','7731','7761','8666','6031') then do;
+if product in ('CREDIT CARDS','LINE/ODF') and compress(security_type) = '' and
+compress(score_ig_cd)=77 and aprvd_amt>50000 then decline_code2='202';
+else if product in ('CREDIT CARDS','LINE/ODF') and compress(security_type) = '' and 
+compress(score_ig_cd) in (80,83,85) and aprvd_amt>100000 then decline_code2='202';
+else if product in ('CREDIT CARDS','LINE/ODF') and compress(security_type) = '' and
+compress(score_ig_cd) = 1 and aprvd_amt>0 then decline_code2='202';
+end;
+end;
+if decline_code='208' then do;
+if business_sic_cd not in ('8653','8654','8651','8652','0211','7739','7731','7761','8666','6031') then decision_code2='';
+if product in ('CREDIT CARDS','LINE/ODF') and  compress(dcsn_ig_cd)=75 and aprvd_amt>0 then decision_code2='208';
+else if product in ('CREDIT CARDS','LINE/ODF') and compress(dcsn_ig_cd)=77 and aprvd_amt>100000 then decision_code2='208';
+else if product in ('CREDIT CARDS','LINE/ODF') and compress(dcsn_ig_cd)=80 and aprvd_amt>175000 then decision_code2='208';
+else if product in ('CREDIT CARDS','LINE/ODF') and compress(dcsn_ig_cd) in (83,85) and aprvd_amt>250000 then decision_code2='208';
+/*add in 208 - if it's revolving and non spp then decision ig 75 and aprvd_amt>0, decision ig 77 and aprvd_amt>100000,
+decision ig 80 and aprvd_amt>175000, decision ig (83,85) and aprvd_amt>250000*/
+end;
+
+/*THESE ARE NON EXCEPTIONS*/
+/*if decline_code='213' then decline_code2='213';*/
+/*if decline_code='213' then decline_code2='';*/
+/*if decline_code='213' then do;
+if app_id in 
+
+('2222306',
+'2326662'
+)
+
+
+and aprvd_amt<25000
+
+then decline_code2='';
+else decline_code2='213';
+end;*/
+
+/*else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=77 and product in ('CREDIT CARDS','LINE/ODF') and aprvd_amt>500000 then decline_code2='212';*/
+/*else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd) in (80,83,85) and product in ('CREDIT CARDS','LINE/ODF') and aprvd_amt>1000000 then decline_code2='212';*/
+
+/*if (compress(score_ig_cd) in (77,80,83,85)) OR (compress(security_type) in ('RRS.','RRE.','Commercial RE.')) OR (product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=75 and compress(security_type)='General.' and aprvd_amt<=300000)*/
+/*then decline_code2='';*/
+/*else decline_code2='212';*/
+/*end;*/
+
+/*if decline_code2='212' and score_ig_cd>=77;*/
+if decline_code not in ('203','208','810','217','806','330122','809','218','804','209','672','330005','330014','219','330100','803','212','805','11','330013','330001','330014','330101',
+'330005','407','330016','330101','330004','330005','330006','205','330019','330015','330012','330002','404','330004','202','208','213') then decline_code2=decline_code;/*remove 350, 33001 in here - therefore treat as exception*/
+end;
+
+/*SPSP ONLY*/
+if prd_cd in ('LRSPSP') then do;
+/**/
+/*if compress(decline_code)='350' then do;*/
+/*if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=1 then decline_code2='350';*/
+/*end;*/
+
+/*if decline_code='212' then do;*/
+/*if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=1 and product in ('CREDIT CARDS','LINE/ODF') then decline_code2='212';*/
+/*else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=75 and product in ('CREDIT CARDS','LINE/ODF') and aprvd_amt>300000 then decline_code2='212';*/
+/*else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=75 and product not in ('CREDIT CARDS','LINE/ODF') then decline_code2='212';*/
+/*end;*/
+
+/*if decline_code='204' then do;*/
+/*if compress(security_type) not in ('RRS.','RRE.','Commercial RE.','General.') and then decline_code2='204';*/
+/*end;*/
+/*if decline_code='213' then decline_code2='';*/
+
+/*else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd)=77 and product in ('CREDIT CARDS','LINE/ODF') and aprvd_amt>500000 then decline_code2='212';*/
+/*else if compress(security_type) not in ('RRS.','RRE.','Commercial RE.') and compress(score_ig_cd) in (80,83,85) and product in ('CREDIT CARDS','LINE/ODF') and aprvd_amt>1000000 then decline_code2='212';*/
+
+
+/*if (compress(score_ig_cd) in (77,80,83,85)) OR (compress(security_type) in ('RRS.','RRE.','Commercial RE.')) OR (product in ('CREDIT CARDS','LINE/ODF') and compress(score_ig_cd)=75 and compress(security_type)='General.' and aprvd_amt<=300000)*/
+/*then decline_code2='';*/
+/*else decline_code2='212';*/
+/*end;*/
+
+/*if decline_code2='212' and score_ig_cd>=77;*/
+if decline_code in ('330018','103','211','105','101','102','104','330017',
+'702','704','707','745','765','330016') then decline_code2=decline_code;
+/*else if decline_code in ('212','350') and decline_code2='' then decline_code2='';*/
+/*else if decline_code in ('212','350') and decline_code2 ne '' then decline_code2=decline_code2;*/
+else decline_code2='';
+end;
+
+if business_sic_cd in ('8653','8654','8651','8652','0211','7739','7731','7761','8666','6031') then decline_code2='';
+if override_code in (500006,500010,500004,500003,500014,500007,500002,500011,500008) then exception='Y'; else exception='N';
+run;
+
+
+/** Add Approved_cnt = 1***/
+
+Proc SQL;
+Create Table EXCEPTION8B as
+Select *,
+
+Case when dcsn_dt_mth between 201811 and 201901 then 'F19Q1'
+	when dcsn_dt_mth between 201902 and 201904 then 'F19Q2'
+	when dcsn_dt_mth between 201905 and 201907 then 'F19Q3'
+	when dcsn_dt_mth between 201908 and 201910 then 'F19Q4'
+	when dcsn_dt_mth between 201911 and 202001 then 'F20Q1'
+	when dcsn_dt_mth between 202002 and 202004 then 'F20Q2'
+	when dcsn_dt_mth between 202005 and 202007 then 'F20Q3'
+	when dcsn_dt_mth between 202008 and 202010 then 'F20Q4'
+	when dcsn_dt_mth between 202011 and 202101 then 'F21Q1'
+	when dcsn_dt_mth between 202102 and 202104 then 'F21Q2'
+	when dcsn_dt_mth between 202105 and 202107 then 'F21Q3'
+	when dcsn_dt_mth between 202108 and 202110 then 'F21Q4'
+	when dcsn_dt_mth between 202111 and 202201 then 'F22Q1'
+	when dcsn_dt_mth between 202202 and 202204 then 'F22Q2'
+	when dcsn_dt_mth between 202205 and 202207 then 'F22Q3'
+	when dcsn_dt_mth between 202208 and 202210 then 'F22Q4'
+	when dcsn_dt_mth between 202211 and 202301 then 'F23Q1'
+	when dcsn_dt_mth between 202302 and 202304 then 'F23Q2'
+	when dcsn_dt_mth between 202305 and 202307 then 'F23Q3'
+	when dcsn_dt_mth between 202308 and 202310 then 'F23Q4'
+	when dcsn_dt_mth between 202311 and 202401 then 'F24Q1'
+	when dcsn_dt_mth between 202402 and 202404 then 'F24Q2'
+	when dcsn_dt_mth between 202405 and 202407 then 'F24Q3'  
+	when dcsn_dt_mth between 202408 and 202410 then 'F24Q4'
+	when dcsn_dt_mth between 202411 and 202501 then 'F25Q 1'/****** Update with new Qtr*****/
+else 'Other'
+end as FQ,
+
+Case when crnt_dcsn_stat_cd="A" then 1 else 0 end as Approved_Cnt
+
+from EXCEPTION8
+;quit;
+
+
+/***Include Decline Messages*****/
+
+/*import initial exception data - update to ensure path name is correct - this file is for low-side override (e.g. Decline to Approve*/
+proc import
+	datafile = "M:\Data\Small Business Risk\Portfolio Management\10 - Adhoc\Teenas Work Drive\For Shanas team\SB_ACE_Exceptions_Inv_Updated2.xlsx"
+	dbms = xlsx
+	out = Decline_messages
+	replace;
+	getnames = yes;
+	OPTIONS VALIDVARNAME=V7;
+	/*sheet="Log";*/
+	range = "Decline Message Codes$A1:0";
+run;
+
+
+
+Proc SQL;
+Create Table Decline_messagesB as
+Select 
+
+MATERIAL_DECLINE_REASON___credit	as decline_reason,
+SYSTEM_ID	as system_id
+
+
+from Decline_messages
+order by system_id, decline_reason desc
+;quit;
+
+
+
+proc sort data=Decline_messagesB;
+by system_id descending decline_reason;
+run;
+
+
+/***remove duplicates***/
+
+Data Decline_messagesB1;
+Set Decline_messagesB;
+by system_id descending decline_reason;
+if first.system_id and first.decline_reason then cnt=1;
+else cnt = 0;
+run;
+
+
+Data Decline_messagesB2;
+Set Decline_messagesB1;
+where cnt=1;
+run;
+
+
+Proc SQL;
+Create Table EXCEPTION9 as
+
+Select a.*, b.system_id, b.decline_reason,
+
+Case when prd_cd like '%SPSP%' then 'SPSP'
+	 when b.decline_reason <> "" then b.decline_reason
+else "All other"
+end as decline_reason2
+
+from EXCEPTION8B as a left join Decline_messagesB2 as b on a.decline_code = b.system_id
+;quit;
+
+
+/**********************************************************/
+/** New ACE Suggested Data dump ****/
+/*comment out code to exclude Decline_code2=""***/
+data exception9B;
+set exception9;
+format Priority $30.;
+/*if decline_code2='' then delete;*/ /**** comment out this step to remove any APPIDs with Decline_code2 as blank per discussionwith ACE***/
+/*if decline_code2 in ('810','806','404','330012','803','804','330006','33001','330014','330005','672','602','601') then delete;*/
+if decline_code2 in ('330018,403','701','741') then Priority=1; /*added 701 and 741*/
+else if decline_code2 in ('12','2','21','804','820','821','822','809','803','330012','404','15','805',
+'806','330019','218') then Priority=2; /*remove 401,604*/
+else if decline_code2 in ('101','103','330017','102','211','11','330003','330015','104','105','710','747','702','703','704',
+'705','706','707','93','708','742','743','744','745','407','330016','765','219','330007') then Priority=3; /*added 330007*/
+else if decline_code2 in ('212b','350b','212','350','8','350','217','212','401','402') then Priority=4; /*added 401,402*/
+else if decline_code2 in ('213','330001','330004','330005','330014','33001','330006','330100','330101') then Priority=5;
+else if decline_code2 in ('218') then Priority=6;
+else if decline_code2 in ('202','204','203','209','208') then Priority=7;
+else if decline_code2 in ('330002','330013','810') then Priority=8;
+
+else if decline_code2 in ('601','602','672','401','604') then Priority=9; /*added 401 and 604*/
+else Priority=10;
+run;
+
+/**********************************************************************/
+/******* Copy last months data sheet to this month******/
+
+X COPY "&Report_path.\SB_ACE_Exceptions_&mth_1..xlsx"  "&Report_path.\SB_ACE_Exceptions_&mth..xlsx";
+
+
+proc export
+	data = EXCEPTION9B
+	dbms = xlsx
+	replace
+	outfile = "&Report_path.\SB_ACE_Exceptions_&mth..xlsx";
+	Sheet="Data";
+run;
+
+
+
+
+proc sort data=exception9B out=exception10 ;
+by app_id app_product_id priority;
+run;
+proc sort data=exception10 out=exception11 nodupkey;
+by app_id app_product_id;
+run;
+
+proc freq data=exception11;
+tables dcsn_dt_mth;
+run;
+
+
+
+proc export
+	data = EXCEPTION11
+	dbms = xlsx
+	outfile="R:\Data\retail lending\Small Business Risk\Small Business Originations\Exception\Exception - Update Template for CRC - &curdate."
+	replace;
+	sheet="Declined Exception - New";
+run;
+proc export
+	data = results
+	dbms = xlsx
+	outfile="R:\Data\retail lending\Small Business Risk\Small Business Originations\Exception\Exception - Update Template for CRC - &curdate."
+	replace;
+	sheet="Approved Exception";
+run;
+/*
+data o;
+set exception11;
+if app_id in (2099430);
+run;
+
+proc sql;
+create table a as
+select
+decision_mth,
+count(*),
+sum(approved_amt) as appramt
+from exception11
+group by 1
+order by 1;
+quit;
+
+data a;
+set exception11;
+if app_id in (2110822,2111551,2112565);
+run;
+*/
