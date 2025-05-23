@@ -1,0 +1,59 @@
+proc import
+	datafile = "M:\Data\GRM_SB\Data Issues Investigation\Delinquency\2025-05-16_Delinquency Mapping.xlsx"
+	dbms = xlsx
+	out = DELQBUCK
+	replace;
+	getnames = yes;
+	sheet="DLQNT_BCKT_MAPPNG_LKP";
+	range = "DLQNT_BCKT_MAPPNG_LKP$A1:E141";
+run;
+
+/*pull most recent can_sb_all data*/
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table CAN_APR as
+select * from connection to odbc (
+	select day_pst_due, dpd_temp, source, os_bal, Bal31p, Bal91p, *
+	from [GRMSMB].[LNDZ].[CAN_SB_ALL]
+	where obs_month = 202504	
+);
+disconnect from ODBC;
+QUIT;
+
+/*convert variable day_pst_due to numeric*/
+data CAN_APR1;
+set CAN_APR;
+day_pst_due1 = input(day_pst_due, 20.);
+run;
+
+/*join delq bucket with can_sb_all table on source*/
+proc sql;
+create table join_bucket as 
+	select a.*,b.*
+	from DELQBUCK a left join CAN_APR1 b 
+	on a.src_sys_cd = b.source
+	where day_pst_due1 between dlqnt_day_min_num and dlqnt_day_max_num
+	;
+quit;
+
+
+/*re-assign balance amount*/
+data join_bucket2;
+set join_bucket;
+length BAL31_NEW 8.;
+length BAL91_NEW 8.;
+length OS_BAL_NEW 8.;
+if dlqnt_bckt_cd NOT IN ('CURR','D001') THEN BAL31_NEW = OS_BAL;
+IF dlqnt_bckt_cd NOT IN ('CURR','D001','D031','D061') THEN BAL91_NEW = OS_BAL;
+if dlqnt_bckt_cd IN ('CURR','D001') THEN OS_BAL_NEW = OS_BAL;
+run;
+
+data join_bucket3;
+set join_bucket2; 
+length compare_31 8.;
+length compare_91 8.;
+if BAL31_NEW = Bal31p then compare_31 = "Same";
+if BAL31_NEW ne Bal31p then compare_31 = "Diff";
+if BAL91_NEW = Bal91p then compare_91 = "Same";
+if BAL91_NEW ne Bal91p then compare_91 = "Diff";
+run;
