@@ -1,0 +1,43 @@
+
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table CAN_BL_DD as
+select * from connection to odbc (
+	select cid_num,obs_month, account_num, source, day_pst_due, nal_status, os_bal
+	from [GRMSMB].[LNDZ].[CAN_SB_ALL]
+);
+disconnect from ODBC;
+QUIT;
+
+
+
+proc import
+	datafile = "M:\Data\GRM_SB\Data Issues Investigation\Delinquency\code resources and validation\BL_91_DELQ.xlsx"
+	dbms = xlsx
+	out = BL_91
+	replace;
+/*	sheet="Sheet1";*/
+	getnames = yes;
+run;
+
+data BL_91_NAL;
+set BL_91;
+cid_num2 = put(cid_num, $15.);
+if nal_status ne "Performing (Not NAL)" and day_pst_due = 0 and cid_num ne NULL;
+run;
+
+data CAN_BL_DD2;
+set CAN_BL_DD;
+cid_num2 = put(cid_num, $20.);
+run;
+
+
+proc sql;
+create table find_nal_dd as 
+	select a.cid_num, b.obs_month, b.account_num, b.source, b.day_pst_due, 
+	b.nal_status, b.os_bal
+	from BL_91_NAL a left join CAN_BL_DD b 	
+	on a.cid_num2 = b.cid_num 
+	where b.source in ("DD","BL")
+	order by a.cid_num, b.obs_month, b.account_num;
+quit;
