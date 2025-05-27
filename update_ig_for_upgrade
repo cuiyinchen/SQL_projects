@@ -1,0 +1,70 @@
+	 WITH A AS (
+    SELECT 
+        cid_num, crs_cust_ig, obs_month, 
+		min(open_month) over (partition by cid_num) as open_month,
+		min(obs_month) over (partition by cid_num) as min_obs_month,
+		-- sum of exposure
+		sum(exposure) over (partition by cid_num, obs_month) as total_exposure,
+        row_number() over (partition by cid_num order by obs_month)-1 AS Months, 
+        case
+            when crs_cust_ig between 65 and 75 then '65-75' 
+            when crs_cust_ig between 77 and 80 then '77-80'
+            when crs_cust_ig between 83 and 85 then '83-85'
+            else 'Other' 					  
+        end as IG_Bucket,
+
+		-- use lag to access ig bucket for previous Month (1 prior)
+        LAG(crs_cust_ig, 3) over (partition by cid_num order by obs_month) AS Prev_crs_cust_ig,
+        LAG(									   
+            case
+                when crs_cust_ig between 65 and 75 then '65-75' 
+				when crs_cust_ig between 77 and 80 then '77-80'
+				when crs_cust_ig between 83 and 85 then '83-85'
+				when crs_cust_ig is NULL then NULL
+				else 'Other' 
+            end
+        , 3) over (partition by cid_num order by obs_month) as Prev_IG_Bucket
+
+    from 
+	( SELECT cid_num, MIN(crs_cust_ig) AS crs_cust_ig, obs_month, min(open_month) as open_month, sum(exposure) AS exposure
+	FROM [GRMSMB].[LNDZ].[can_sb_all]
+	where crs_cust_ig is not null 
+	and crs_cust_ig not in (1,0)
+	GROUP BY cid_num, obs_month
+    ) TEMP
+),
+
+B AS (			  
+    select distinct cid_num, industry, province, city_nm, sic_group, program, product_type
+    FROM [GRMSMB].[LNDZ].[can_sb_all]
+	--WHERE obs_month is one month prior
+    WHERE obs_month = convert(char(6), dateadd(month,-1,getdate()),112)
+)
+
+select 
+    A.cid_num, A.Months, A.crs_cust_ig, A.Prev_crs_cust_ig,A.Prev_IG_Bucket, A.IG_Bucket, A.open_month, 
+	A.obs_month, A.total_exposure, A.min_obs_month,
+    B.industry, B.province, B.city_nm, B.sic_group, B.program, B.product_type,
+    case		 
+        when A.Prev_IG_Bucket IS NULL then 'New'	
+		-- if they have different ig buckets (now and previous)
+        when A.IG_Bucket <> A.Prev_IG_Bucket and A.Prev_crs_cust_ig between 65 and 85 then 
+        case
+            when A.crs_cust_ig > A.Prev_crs_cust_ig then 'Upgrade' 		    
+			else 'Downgrade' 
+        end
+		-- if same ig buckets between 2 Months
+        when A.IG_Bucket = A.Prev_IG_Bucket then 
+        case
+            when A.crs_cust_ig > A.Prev_crs_cust_ig then 'Slight Upgrade' 
+            when A.crs_cust_ig < A.Prev_crs_cust_ig then 'Slight Downgrade' 
+            else 'Same' 
+        end	
+		else 'Invalid_Migration'
+    end	as IG_Migration
+													 
+from A inner join B 
+on A.cid_num = B.cid_num
+where Months in (0,3) and 	A.IG_Bucket <> 'Other' 
+and (A.Prev_IG_Bucket is NULL or A.Prev_IG_Bucket <> 'Other')
+order by A.cid_num
