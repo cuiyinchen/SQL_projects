@@ -1,0 +1,19 @@
+select A.*, b.* from
+(
+SELECT obs_month, acct_num, cidkey15, cust_nm, os_bal, day_pst_due
+  FROM [GRMSMB].[LNDZ].[can_sb_all] A
+  where (day_pst_due <= 30 or day_pst_due is null)
+  and source = 'BL'
+  and nal_bckt_desc = 'NAL in Current Month'
+) A
+  left join
+  (
+ 
+  select * from
+  (
+SELECT obs_month, acct_num, cidkey15, os_bal, day_pst_due, source, row_number() over (partition by account_num order by obs_month desc) as Row_Num
+  FROM [GRMSMB].[LNDZ].[can_sb_all]
+  where source in ('DD')
+  ) test where Row_Num = 1
+ 
+  ) b on a.cidkey15 = b.cidkey15
