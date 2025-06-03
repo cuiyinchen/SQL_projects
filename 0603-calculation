@@ -1,0 +1,30 @@
+select A.*, B.*,
+	case when (a.os_bal_BL <> 0 or a.os_bal_BL <> NULL) then (abs(a.os_bal_BL - b.os_bal_DD)/a.os_bal_BL)*100 
+	else 'NA' end as Diff_percentage,
+	case when (abs(a.os_bal_BL - b.os_bal_DD) <= 0.2*NULLIF(a.os_bal_BL,0) or abs(a.os_bal_BL - b.os_bal_DD) <= 0.2*NULLIF(b.os_bal_DD,0))
+	then 'valid transition' 
+	else 'invalid' end Flag_Transition
+from
+	(SELECT obs_month as obs_month_BL, open_month as open_month_BL, acct_num as acct_num_BL, cidkey15, cust_nm, 
+	os_bal as os_bal_BL, day_pst_due as day_pst_due_BL
+	FROM [GRMSMB].[LNDZ].[can_sb_all] A
+	where (day_pst_due <= 30 or day_pst_due is null)
+	and source = 'BL'
+	and nal_bckt_desc = 'NAL in Current Month' 
+) A
+  left join
+  (
+  select * from
+  (
+	SELECT obs_month as obs_month_DD, open_month as open_month_DD, acct_num as acct_num_DD, cidkey15, 
+	os_bal as os_bal_DD, day_pst_due as day_pst_due_DD, 
+	row_number() over (partition by account_num order by obs_month desc) as Row_Num_DD
+	FROM [GRMSMB].[LNDZ].[can_sb_all]
+	where source in ('DD')
+  ) test
+  where Row_Num_DD = 1
+  ) B 
+on a.cidkey15 = b.cidkey15
+where dateadd(month, -1, cast(cast(a.open_month_BL * 100 + 1 as char(8)) as date)) 
+= cast(cast(b.obs_month_DD * 100 + 1 as char(8)) as date)
+order by a.cidkey15
