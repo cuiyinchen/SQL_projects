@@ -1,0 +1,506 @@
+
+
+
+*%include "C:\temp\SAS_Program.sas"; 
+
+*%include "C:\temp\SAS_Libraries.sas";
+
+
+
+
+%let mth=%sysfunc(intnx(month, %sysfunc(today()), -1),yymmn6.); 
+%let mth_1=%sysfunc(intnx(month, %sysfunc(today()), -2),yymmn6.); 
+
+
+%let obs_month = 202505;
+
+
+
+%macro append_bk(mth) ;
+
+proc delete data = tmp_new_book; run;
+
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+   create table tmp_new_book as
+
+select * from connection to odbc (
+Select 
+	a.obs_month
+	,a.acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,b.[latest_final_dcsn_ig_cd] as IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,case
+		when a.program LIKE 'Agri%' then 'Ag'
+		when a.program LIKE 'SPP%' then 'SPP'
+		when a.program LIKE 'SPSP%' then 'SPSP'
+		else a.program
+	end as program2
+	,'SWX' as source_ig
+	,a.Source as source
+	,a.[Source3] as source_3
+
+  FROM [GRMSMB].[LNDZ].[can_sb_all] a
+  left join (Select distinct [application_primary_cust_id], [dcsn_dt_mth],max([latest_final_dcsn_ig_cd]) as [latest_final_dcsn_ig_cd]
+			  from [GRMSMB].[LNDZ].[SB_SW_MTHLY_RPT] where [crnt_dcsn_stat_cd] = 'A' and [dcsn_dt_mth] = &i. 
+			group by [application_primary_cust_id], [dcsn_dt_mth]) b
+  on a.[primary_cust_cid] = b.[application_primary_cust_id]
+  and a.open_month = b.[dcsn_dt_mth]
+where  a.open_month = &i.
+  and b.[latest_final_dcsn_ig_cd] is not null
+  and a.segment not in ('CEBA')
+  and a.obs_month = &obs_month.
+
+union all
+
+Select 
+	a.obs_month
+	,a.acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,c.ig as IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,case
+		when a.program LIKE 'Agri%' then 'Ag'
+		when a.program LIKE 'SPP%' then 'SPP'
+		when a.program LIKE 'SPSP%' then 'SPSP'
+		else a.program
+	end as program2
+	,'DRE' as source_ig
+	,a.Source as source
+	,a.[Source3] as source_3
+
+  FROM [GRMSMB].[LNDZ].[can_sb_all] a
+
+  left join (Select distinct [application_primary_cust_id], [dcsn_dt_mth],max([latest_final_dcsn_ig_cd]) as [latest_final_dcsn_ig_cd]
+			  from [GRMSMB].[LNDZ].[SB_SW_MTHLY_RPT] where [crnt_dcsn_stat_cd] = 'A' and [dcsn_dt_mth] = &i. 
+			group by [application_primary_cust_id], [dcsn_dt_mth]) b
+  on a.[primary_cust_cid] = b.[application_primary_cust_id]
+
+  left join ( select * from [GRMSMB].[LNDZ].[dre] where decision  = 'A' and decision_month  = &i. ) c
+  on  a.[primary_cust_cid] = c.cid
+  and a.open_month = c.[decision_month]
+where  a.open_month = &i.
+  and b.[latest_final_dcsn_ig_cd] is null
+  and c.ig is not null
+  and a.segment not in ('CEBA')
+  and a.obs_month = &obs_month.
+
+union all
+
+Select 
+	a.obs_month
+	,a.acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,a.crs_cust_ig as IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,case
+		when a.program LIKE 'Agri%' then 'Ag'
+		when a.program LIKE 'SPP%' then 'SPP'
+		when a.program LIKE 'SPSP%' then 'SPSP'
+		else a.program
+	end as program2
+	,'CRS' as source_ig
+	,a.Source as source
+	,a.[Source3] as source_3
+
+  FROM [GRMSMB].[LNDZ].[can_sb_all] a
+
+  left join (Select distinct [application_primary_cust_id], [dcsn_dt_mth],max([latest_final_dcsn_ig_cd]) as [latest_final_dcsn_ig_cd]
+			  from [GRMSMB].[LNDZ].[SB_SW_MTHLY_RPT] where [crnt_dcsn_stat_cd] = 'A' and [dcsn_dt_mth] = &i. 
+			group by [application_primary_cust_id], [dcsn_dt_mth]) b
+  on a.[primary_cust_cid] = b.[application_primary_cust_id]
+
+  left join ( select * from [GRMSMB].[LNDZ].[dre] where decision  = 'A' and decision_month  = &i. ) c
+  on  a.[primary_cust_cid] = c.cid
+  and a.open_month = c.[decision_month]
+where  a.open_month = &i.
+  and b.[latest_final_dcsn_ig_cd] is null
+  and c.ig is null
+  and a.crs_cust_ig is not null
+  and a.segment not in ('CEBA')
+  and a.obs_month = &obs_month.
+
+union all
+
+Select 
+	a.obs_month
+	,a.acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,a.ig_cd as IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,case
+		when a.program LIKE 'Agri%' then 'Ag'
+		when a.program LIKE 'SPP%' then 'SPP'
+		when a.program LIKE 'SPSP%' then 'SPSP'
+		else a.program
+	end as program2
+	,'Facility IG' as source_ig
+	,a.Source as source
+	,a.[Source3] as source_3
+
+  FROM [GRMSMB].[LNDZ].[can_sb_all] a
+
+  left join (Select distinct [application_primary_cust_id], [dcsn_dt_mth],max([latest_final_dcsn_ig_cd]) as [latest_final_dcsn_ig_cd]
+			  from [GRMSMB].[LNDZ].[SB_SW_MTHLY_RPT] where [crnt_dcsn_stat_cd] = 'A' and [dcsn_dt_mth] = &i. 
+			group by [application_primary_cust_id], [dcsn_dt_mth]) b
+  on a.[primary_cust_cid] = b.[application_primary_cust_id]
+
+  left join ( select * from [GRMSMB].[LNDZ].[dre] where decision  = 'A' and decision_month  = &i. ) c
+  on  a.[primary_cust_cid] = c.cid
+  and a.open_month = c.[decision_month]
+where  a.open_month = &i.
+  and b.[latest_final_dcsn_ig_cd] is null
+  and c.ig is null
+  and a.crs_cust_ig is null
+  and a.segment not in ('CEBA')
+  and a.obs_month = &obs_month.
+
+;);
+disconnect from ODBC;
+QUIT;
+
+
+proc append base = new_book_dat data = tmp_new_book force; run;
+
+%mend;
+
+
+%macro get_bookings_data;
+	proc delete data = new_book_dat; run;
+
+	%do i = 202307 %to &mth.;
+		%append_bk(&i);
+		%let y = %eval(&i. / 100);
+		%let m = %eval(&i. - &y. * 100);
+		%if &m. = 12 %then %let i = %eval(&i. + 88);
+	%end;
+%mend;
+%get_bookings_data;
+
+/*proc freq data=new_book_dat;tables open_month;run;*/
+
+
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+   create table precovid as
+
+select * from connection to odbc (
+Select 
+	a.obs_month
+	,a.acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,b.[latest_final_dcsn_ig_cd] as IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,case
+		when a.program LIKE 'Agri%' then 'Ag'
+		when a.program LIKE 'SPP%' then 'SPP'
+		when a.program LIKE 'SPSP%' then 'SPSP'
+		else a.program
+	end as program2
+	,'SWX' as source_ig
+	,a.Source as source
+	,a.[Source3] as source_3
+
+  FROM [GRMSMB].[LNDZ].[can_sb_all] a
+  left join (Select distinct [application_primary_cust_id], [dcsn_dt_mth],max([latest_final_dcsn_ig_cd]) as [latest_final_dcsn_ig_cd]
+			  from [GRMSMB].[LNDZ].[SB_SW_MTHLY_RPT] where [crnt_dcsn_stat_cd] = 'A' and [dcsn_dt_mth] = 202001 
+			group by [application_primary_cust_id], [dcsn_dt_mth]) b
+  on a.[primary_cust_cid] = b.[application_primary_cust_id]
+  and a.open_month = b.[dcsn_dt_mth]
+where  a.open_month = 202001 
+  and b.[latest_final_dcsn_ig_cd] is not null
+  and a.segment not in ('CEBA')
+  and a.obs_month = 202001 
+
+union all
+
+Select 
+	a.obs_month
+	,a.acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,c.ig as IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,case
+		when a.program LIKE 'Agri%' then 'Ag'
+		when a.program LIKE 'SPP%' then 'SPP'
+		when a.program LIKE 'SPSP%' then 'SPSP'
+		else a.program
+	end as program2
+	,'DRE' as source_ig
+	,a.Source as source
+	,a.[Source3] as source_3
+
+  FROM [GRMSMB].[LNDZ].[can_sb_all] a
+
+  left join (Select distinct [application_primary_cust_id], [dcsn_dt_mth],max([latest_final_dcsn_ig_cd]) as [latest_final_dcsn_ig_cd]
+			  from [GRMSMB].[LNDZ].[SB_SW_MTHLY_RPT] where [crnt_dcsn_stat_cd] = 'A' and [dcsn_dt_mth] = 202001 
+			group by [application_primary_cust_id], [dcsn_dt_mth]) b
+  on a.[primary_cust_cid] = b.[application_primary_cust_id]
+
+  left join ( select * from [GRMSMB].[LNDZ].[dre] where decision  = 'A' and decision_month  = 202001  ) c
+  on  a.[primary_cust_cid] = c.cid
+  and a.open_month = c.[decision_month]
+where  a.open_month = 202001 
+  and b.[latest_final_dcsn_ig_cd] is null
+  and c.ig is not null
+  and a.segment not in ('CEBA')
+  and a.obs_month = 202001 
+
+union all
+
+Select 
+	a.obs_month
+	,a.acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,a.crs_cust_ig as IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,case
+		when a.program LIKE 'Agri%' then 'Ag'
+		when a.program LIKE 'SPP%' then 'SPP'
+		when a.program LIKE 'SPSP%' then 'SPSP'
+		else a.program
+	end as program2
+	,'CRS' as source_ig
+	,a.Source as source
+	,a.[Source3] as source_3
+
+  FROM [GRMSMB].[LNDZ].[can_sb_all] a
+
+  left join (Select distinct [application_primary_cust_id], [dcsn_dt_mth],max([latest_final_dcsn_ig_cd]) as [latest_final_dcsn_ig_cd]
+			  from [GRMSMB].[LNDZ].[SB_SW_MTHLY_RPT] where [crnt_dcsn_stat_cd] = 'A' and [dcsn_dt_mth] = 202001  
+			group by [application_primary_cust_id], [dcsn_dt_mth]) b
+  on a.[primary_cust_cid] = b.[application_primary_cust_id]
+
+  left join ( select * from [GRMSMB].[LNDZ].[dre] where decision  = 'A' and decision_month  = 202001  ) c
+  on  a.[primary_cust_cid] = c.cid
+  and a.open_month = c.[decision_month]
+where  a.open_month = 202001 
+  and b.[latest_final_dcsn_ig_cd] is null
+  and c.ig is null
+  and a.crs_cust_ig is not null
+  and a.segment not in ('CEBA')
+  and a.obs_month = 202001 
+
+union all
+
+Select 
+	a.obs_month
+	,a.acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,a.ig_cd as IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,case
+		when a.program LIKE 'Agri%' then 'Ag'
+		when a.program LIKE 'SPP%' then 'SPP'
+		when a.program LIKE 'SPSP%' then 'SPSP'
+		else a.program
+	end as program2
+	,'Facility IG' as source_ig
+	,a.Source as source
+	,a.[Source3] as source_3
+
+  FROM [GRMSMB].[LNDZ].[can_sb_all] a
+
+  left join (Select distinct [application_primary_cust_id], [dcsn_dt_mth],max([latest_final_dcsn_ig_cd]) as [latest_final_dcsn_ig_cd]
+			  from [GRMSMB].[LNDZ].[SB_SW_MTHLY_RPT] where [crnt_dcsn_stat_cd] = 'A' and [dcsn_dt_mth] = 202001  
+			group by [application_primary_cust_id], [dcsn_dt_mth]) b
+  on a.[primary_cust_cid] = b.[application_primary_cust_id]
+
+  left join ( select * from [GRMSMB].[LNDZ].[dre] where decision  = 'A' and decision_month  = 202001  ) c
+  on  a.[primary_cust_cid] = c.cid
+  and a.open_month = c.[decision_month]
+where  a.open_month = 202001 
+  and b.[latest_final_dcsn_ig_cd] is null
+  and c.ig is null
+  and a.crs_cust_ig is null
+  and a.segment not in ('CEBA')
+  and a.obs_month = 202001 
+
+;);
+disconnect from ODBC;
+QUIT;
+
+
+PROC SQL;
+   CREATE TABLE new_book_dat_2 AS
+	select  	
+	a.obs_month
+	,Max(a.acct_num) as acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,a.program2
+	,a.IG
+	,a.source_ig
+	,a.Source 
+	,a.source_3
+FROM new_book_dat a
+Group by
+	a.obs_month
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,a.IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,a.program2
+	,a.source_ig
+	,a.Source 
+	,a.source_3
+
+	union all
+
+		select  	
+	a.obs_month
+	,Max(a.acct_num) as acct_num
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,a.program2
+	,a.IG
+	,a.source_ig
+	,a.Source 
+	,a.source_3
+FROM precovid a
+Group by
+	a.obs_month
+	,a.primary_cust_cid 
+	,a.open_month
+	,a.open_quarter
+	,a.IG
+	,a.exposure
+	,a.limit
+	,a.os_bal
+	,a.product_type
+	,a.program
+	,a.province
+	,a.sic_code
+	,a.sic_desc
+	,a.sic_group
+	,a.program2
+	,a.source_ig
+	,a.Source 
+	,a.source_3
+
+;
+QUIT;
+
+
+/*proc freq data=new_book_dat_2;tables obs_month;run;*/
+
+proc export
+	data = new_book_dat_2
+	dbms = xlsx
+	outfile="M:\Data\Small Business Risk\Small Business Canada\Portfolio Analytics & Innovation\Reporting\CRC\2025\May 2025 Data\Resources\new_bookings_V2_MoM_YoY_&mth..xlsx"
+	replace;
+	sheet="data";
+run;
+
+
+
