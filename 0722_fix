@@ -1,0 +1,41 @@
+proc import datafile="C:\your_path\your_file.csv"
+    out=work.input_csv
+    dbms=csv
+    replace;
+    getnames=yes;
+run;
+
+proc sql;
+    create table work.can_sb_agg as
+    select
+        cust_nm,
+        program,
+        sum(bal91p) as total_bal91p
+    from GRMSMB.LNDZ.can_sb_all
+    group by cust_nm, program;
+quit;
+
+proc sql;
+    create table work.joined as
+    select 
+        a.Name_Borrower,
+        a.SIC,
+        b.program as BB_Program_filled,
+        b.total_bal91p as Rate91p_filled,
+        spedis(a.Name_Borrower, b.cust_nm) as match_score
+    from work.input_csv a, work.can_sb_agg b
+    where spedis(a.Name_Borrower, b.cust_nm) < 50
+    group by a.Name_Borrower
+    having calculated match_score = min(calculated match_score);
+quit;
+
+proc sql;
+    create table work.final_output as
+    select 
+        a.*,
+        b.BB_Program_filled,
+        b.Rate91p_filled
+    from work.input_csv a
+    left join work.joined b
+    on a.Name_Borrower = b.Name_Borrower;
+quit;
