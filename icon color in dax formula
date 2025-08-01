@@ -1,0 +1,136 @@
+IconStatusMeasure =
+VAR attr = SELECTEDVALUE(data_values[attribute])
+VAR val = data_values[Actual_Recent]
+RETURN
+    SWITCH(
+        TRUE(),
+
+        attr = "ig < 75" && val > 0.05, 3,
+        attr = "ig < 75" && val >= 0.03 && val <= 0.05, 2,
+        attr = "ig < 75" && val < 0.03, 1,
+
+        attr = "ig < 80" && val > 0.15, 3,
+        attr = "ig < 80" && val >= 0.12 && val <= 0.15, 2,
+        attr = "ig < 80" && val < 0.12, 1,
+
+        attr = "Restaurant" && val > 0.05, 3,
+        attr = "Restaurant" && val >= 0.03 && val <= 0.05, 2,
+        attr = "Restaurant" && val < 0.03, 1,
+
+        attr = "Trucking" && val > 0.05, 3,
+        attr = "Trucking" && val >= 0.03 && val <= 0.05, 2,
+        attr = "Trucking" && val < 0.03, 1,
+
+        attr = "Construction" && val > 0.11, 3,
+        attr = "Construction" && val >= 0.08 && val <= 0.11, 2,
+        attr = "Construction" && val < 0.08, 1,
+
+        attr = "High Risk Industries" && val > 0.15, 3,
+        attr = "High Risk Industries" && val >= 0.12 && val <= 0.15, 2,
+        attr = "High Risk Industries" && val < 0.12, 1,
+
+        attr = "Quebec" && val > 0.1, 3,
+        attr = "Quebec" && val >= 0.07 && val <= 0.1, 2,
+        attr = "Quebec" && val < 0.07, 1,
+
+        attr = "Start Up" && val > 0.15, 3,
+        attr = "Start Up" && val >= 0.13 && val <= 0.15, 2,
+        attr = "Start Up" && val < 0.13, 1,
+
+        attr = "Holding Company" && val > 0.1, 3,
+        attr = "Holding Company" && val >= 0.07 && val <= 0.1, 2,
+        attr = "Holding Company" && val < 0.07, 1,
+
+        attr = "High Risk segment" && val > 0.22, 3,
+        attr = "High Risk segment" && val >= 0.2 && val <= 0.22, 2,
+        attr = "High Risk segment" && val < 0.2, 1,
+
+        attr = "Agriculture" && val > 0.22, 3,
+        attr = "Agriculture" && val >= 0.2 && val <= 0.22, 2,
+        attr = "Agriculture" && val < 0.2, 1,
+
+        attr = "SPP" && val > 0.33, 3,
+        attr = "SPP" && val >= 0.3 && val <= 0.35, 2,
+        attr = "SPP" && val < 0.3, 1,
+
+        attr = "SPP T1" && val > 0.33, 3,
+        attr = "SPP T1" && val >= 0.3 && val <= 0.33, 2,
+        attr = "SPP T1" && val < 0.3, 1,
+
+        attr = "SPP T2" && val > 0.09, 3,
+        attr = "SPP T2" && val >= 0.07 && val <= 0.09, 2,
+        attr = "SPP T2" && val < 0.07, 1,
+
+        attr = "SPP T3" && val > 0.05, 3,
+        attr = "SPP T3" && val >= 0.04 && val <= 0.05, 2,
+        attr = "SPP T3" && val < 0.04, 1,
+
+        attr = "Student" && val > 0.3, 3,
+        attr = "Student" && val >= 0.25 && val <= 0.3, 2,
+        attr = "Student" && val < 0.25, 1,
+
+        attr = "Franchise" && val > 0.05, 3,
+        attr = "Franchise" && val >= 0.04 && val <= 0.05, 2,
+        attr = "Franchise" && val < 0.04, 1,
+
+        attr = "MUSH" && val > 0.01, 3,
+        attr = "MUSH" && val >= 0.008 && val <= 0.01, 2,
+        attr = "MUSH" && val < 0.008, 1,
+
+        attr = "NFP" && val > 0.02, 3,
+        attr = "NFP" && val >= 0.015 && val <= 0.02, 2,
+        attr = "NFP" && val < 0.015, 1,
+
+        attr = "Core" && val > 0.5, 3,
+        attr = "Core" && val >= 0.4 && val <= 0.5, 2,
+        attr = "Core" && val < 0.4, 1,
+
+        attr = "CC OL $" && val > 7, 3,
+        attr = "CC OL $" && val >= 4 && val <= 7, 2,
+        attr = "CC OL $" && val < 4, 1,
+
+        attr = "CC OL #" && val > 100, 3,
+        attr = "CC OL #" && val >= 80 && val <= 100, 2,
+        attr = "CC OL #" && val < 80, 1,
+
+        attr = "CreditCard CC OL $" && val > 7, 3,
+        attr = "CreditCard CC OL $" && val >= 4 && val <= 7, 2,
+        attr = "CreditCard CC OL $" && val < 4, 1,
+
+        attr = "CreditCard CC OL #" && val > 100, 3,
+        attr = "CreditCard CC OL #" && val >= 80 && val <= 100, 2,
+        attr = "CreditCard CC OL #" && val < 80, 1,
+
+        attr = "BL Visa CC OL $" && val > 7, 3,
+        attr = "BL Visa CC OL $" && val >= 4 && val <= 7, 2,
+        attr = "BL Visa CC OL $" && val < 4, 1,
+
+        attr = "BL Visa CC OL #" && val > 100, 3,
+        attr = "BL Visa CC OL #" && val >= 80 && val <= 100, 2,
+        attr = "BL Visa CC OL #" && val < 80, 1,
+
+        attr = "DD OL $" && val > 15, 3,
+        attr = "DD OL $" && val >= 10 && val <= 15, 2,
+        attr = "DD OL $" && val < 10, 1,
+
+        attr = "DD OL #" && val > 50, 3,
+        attr = "DD OL #" && val >= 45 && val <= 50, 2,
+        attr = "DD OL #" && val < 45, 1,
+
+        attr = "TOR" && val > 5000, 3,
+        attr = "TOR" && val >= 4000 && val <= 5000, 2,
+        attr = "TOR" && val < 4000, 1,
+
+        attr = "HASCAP" && val > 0.03, 3,
+        attr = "HASCAP" && val >= 0.02 && val <= 0.03, 2,
+        attr = "HASCAP" && val < 0.02, 1,
+
+        attr = "CSBFP" && val > 0.03, 3,
+        attr = "CSBFP" && val >= 0.02 && val <= 0.03, 2,
+        attr = "CSBFP" && val < 0.02, 1,
+
+        0
+    )
+
+
+
