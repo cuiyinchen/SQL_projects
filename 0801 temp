@@ -1,0 +1,7 @@
+        attr = "Approvals <80 #" && [App<80_#Recent] > 0.3, 3,
+        attr = "Approvals <80 #" && [App<80_#Recent] >= 0.25 && [App<80_#Recent] <= 0.3, 2,
+        attr = "Approvals <80 #" && [App<80_#Recent] < 0.25, 1,
+
+        attr = "Approvals <80 $" && [App<80_$Recent] > 0.3, 3,
+        attr = "Approvals <80 $" && [App<80_$Recent] >= 0.25 && [App<80_$Recent] <= 0.3, 2,
+        attr = "Approvals <80 $" && [App<80_$Recent] < 0.25, 1,
