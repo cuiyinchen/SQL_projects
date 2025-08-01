@@ -1,0 +1,82 @@
+FontColorMeasure =
+VAR attr = SELECTEDVALUE(data_values[attribute])
+VAR val = data_values[Actual_Recent]
+
+RETURN
+    SWITCH(
+        TRUE(),
+
+        attr = "ig < 75" && val > 0.05, "#FF0000",      // Red
+        attr = "ig < 75" && val >= 0.03 && val <= 0.05, "#FFFF00",  // Yellow
+        attr = "ig < 80" && val > 0.15, "#FF0000",      
+        attr = "ig < 80" && val >= 0.12 && val <= 0.15, "#FFFF00",  
+
+        attr = "Restaurant" && val > 0.05, "#FF0000",      
+        attr = "Restaurant" && val >= 0.03 && val <= 0.05, "#FFFF00",  
+        attr = "Trucking" && val > 0.05, "#FF0000",      
+        attr = "Trucking" && val >= 0.03 && val <= 0.05, "#FFFF00",  
+        attr = "Construction" && val > 0.11, "#FF0000",      
+        attr = "Construction" && val >= 0.08 && val <= 0.11, "#FFFF00",  
+        attr = "High Risk Industries" && val > 0.15, "#FF0000",      
+        attr = "High Risk Industries" && val >= 0.12 && val <= 0.15, "#FFFF00",  
+
+        attr = "Quebec" && val > 0.1, "#FF0000",      
+        attr = "Quebec" && val >= 0.07 && val <= 0.1, "#FFFF00",  
+        attr = "Start Up" && val > 0.15, "#FF0000",      
+        attr = "Start Up" && val >= 0.13 && val <= 0.15, "#FFFF00",  
+        attr = "Holding Company" && val > 0.1, "#FF0000",      
+        attr = "Holding Company" && val >= 0.07 && val <= 0.1, "#FFFF00",  
+        attr = "High Risk segment" && val > 0.22, "#FF0000",      
+        attr = "High Risk segment" && val >= 0.2 && val <= 0.22, "#FFFF00",  
+
+        attr = "Agriculture" && val > 0.22, "#FF0000",      
+        attr = "Agriculture" && val >= 0.2 && val <= 0.22, "#FFFF00",  
+        attr = "SPP" && val > 0.3, "#FF0000",      
+        attr = "SPP" && val >= 0.3 && val <= 0.35, "#FFFF00",  
+        attr = "SPP T1" && val > 0.33, "#FF0000",      
+        attr = "SPP T1" && val >= 0.3 && val <= 0.33, "#FFFF00",  
+        attr = "SPP T2" && val > 0.09, "#FF0000",      
+        attr = "SPP T2" && val >= 0.07 && val <= 0.09, "#FFFF00",  
+        attr = "SPP T3" && val > 0.05, "#FF0000",      
+        attr = "SPP T3" && val >= 0.04 && val <= 0.05, "#FFFF00",  
+        attr = "Student" && val > 0.3, "#FF0000",      
+        attr = "Student" && val >= 0.25 && val <= 0.3, "#FFFF00",  
+        attr = "Franchise" && val > 0.05, "#FF0000",      
+        attr = "Franchise" && val >= 0.04 && val <= 0.05, "#FFFF00",  
+        attr = "MUSH" && val > 0.01, "#FF0000",      
+        attr = "MUSH" && val >= 0.008 && val <= 0.01, "#FFFF00",  
+        attr = "NFP" && val > 0.02, "#FF0000",      
+        attr = "NFP" && val >= 0.015 && val <= 0.02, "#FFFF00",  
+        attr = "Core" && val > 0.5, "#FF0000",      
+        attr = "Core" && val >= 0.4 && val <= 0.5, "#FFFF00",  
+
+        attr = "CC OL $" && val > 7, "#FF0000",      
+        attr = "CC OL $" && val >= 4 && val <= 7, "#FFFF00",  
+        attr = "CC OL #" && val > 100, "#FF0000",      
+        attr = "CC OL #" && val >= 80 && val <= 100, "#FFFF00",  
+        attr = "CreditCard CC OL $" && val > 7, "#FF0000",      
+        attr = "CreditCard CC OL $" && val >= 4 && val <= 7, "#FFFF00",  
+        attr = "CreditCard CC OL #" && val > 100, "#FF0000",      
+        attr = "CreditCard CC OL #" && val >= 80 && val <= 100, "#FFFF00",  
+        attr = "BL Visa CC OL $" && val > 7, "#FF0000",      
+        attr = "BL Visa CC OL $" && val >= 4 && val <= 7, "#FFFF00",  
+        attr = "BL Visa CC OL #" && val > 100, "#FF0000",      
+        attr = "BL Visa CC OL #" && val >= 80 && val <= 100, "#FFFF00",  
+        attr = "DD OL $" && val > 15, "#FF0000",      
+        attr = "DD OL $" && val >= 10 && val <= 15, "#FFFF00",  
+        attr = "DD OL #" && val > 50, "#FF0000",      
+        attr = "DD OL #" && val >= 45 && val <= 50, "#FFFF00",  
+        attr = "TOR" && val > 5000, "#FF0000",      
+        attr = "TOR" && val >= 4000 && val <= 5000, "#FFFF00",  
+
+        attr = "HASCAP" && val > 0.03, "#FF0000",      
+        attr = "HASCAP" && val >= 0.02 && val <= 0.03, "#FFFF00",  
+        attr = "CSBFP" && val > 0.03, "#FF0000",      
+        attr = "CSBFP" && val >= 0.02 && val <= 0.03, "#FFFF00",  
+
+        // Default
+        "#000000"  // Black
+
+    )
+
+
