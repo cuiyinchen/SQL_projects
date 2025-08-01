@@ -1,0 +1,25 @@
+FontColorMeasure = 
+SWITCH(
+    TRUE(),
+    
+    // For attribute = "ig<75"
+    SELECTEDVALUE(data_values[attribute]) = "ig<75" && 
+    data_values[value] > data_values[limit], "#FF0000",  -- Red
+    SELECTEDVALUE(data_values[attribute]) = "ig<75" && 
+    data_values[value] >= data_values[ewt] && data_values[value] <= data_values[limit], "#FFFF00",  -- Yellow
+
+    // For attribute = "ig>80"
+    SELECTEDVALUE(data_values[attribute]) = "ig>80" && 
+    data_values[value] >= data_values[ewt] && data_values[value] <= data_values[limit], "#00FF00",  -- Example: Green
+    SELECTEDVALUE(data_values[attribute]) = "ig>80" && 
+    data_values[value] > data_values[limit], "#FF0000",
+
+    // For attribute = "restaurant"
+    SELECTEDVALUE(data_values[attribute]) = "restaurant" && 
+    data_values[value] > data_values[limit], "#FFA500",  -- Orange
+    SELECTEDVALUE(data_values[attribute]) = "restaurant" && 
+    data_values[value] >= data_values[ewt] && data_values[value] <= data_values[limit], "#ADD8E6",  -- Light blue
+
+    // Default font color
+    "#000000"  -- Black
+)
