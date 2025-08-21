@@ -1,0 +1,101 @@
+SELECT 
+
+	 count(*) as count_loan
+	 ,count(account_num) as account_num
+	 ,count([cid_num]) as customer_num
+	 ,sum([os_bal]) as os_bal
+	 ,sum([exposure]) as exposure
+	 ,sum([Unit31p]) as Unit31p
+     ,sum([Bal31p]) as Bal31p
+     ,sum([Unit91p]) as Unit91p
+     ,sum([Bal91p]) as Bal91p
+     ,sum([NAL_unit]) as Nal_unit
+     ,[prd_special]
+     ,product_type
+	 ,prd_desc
+     ,[obs_month]
+	 ,open_month
+     ,[program]
+	 ,security_type
+	 ,security_category
+	 ,sic_group
+	 ,sic_category
+	 ,industry
+	 ,industry2
+	 ,[ig_cd]
+	 ,[crs_cust_ig]
+
+	  FROM [GRMSMB].[RPTZ].[can_sb_all_13M]
+	  where 
+	  mfb = '6' and
+(
+ ( [ic_ln_loan_status] in ('4','3','6')
+  and ig_cd <> 21)
+  or
+  ( [ic_ln_loan_status] is null
+  and ig_cd <> 21)
+  or
+  ([ic_ln_loan_status] is null
+  and ig_cd is null)
+  or
+    ([ic_ln_loan_status] in ('4','3','6')
+  and ig_cd = 21)
+    or
+  ([ic_ln_loan_status] = '7'
+  and ig_cd <> 21))
+    group by  
+     [prd_special]
+     ,product_type
+	 ,prd_desc
+     ,[obs_month]
+	 ,open_month
+     ,[program]
+	 ,security_type
+	 ,security_category
+	 ,sic_group
+	 ,sic_category
+	 ,industry
+	 ,industry2
+	 ,[ig_cd]
+	 ,[crs_cust_ig]
+
+---
+SELECT 
+      [obs_month]
+     ,[program]
+	 ,count(*) as count_loan
+	 ,sum([os_bal]) as os_bal
+	 ,sum([exposure]) as exposure
+	 ,sum([Unit31p]) as Unit31p
+     ,sum([Bal31p]) as Bal31p
+     ,sum([Unit91p]) as Unit91p
+     ,sum([Bal91p]) as Bal91p
+     ,sum([NAL_unit]) as Nal_unit
+, [prd_special]
+,product_type
+,new_channel
+,[security_type]
+,[security_category]
+,province
+,industry
+	  FROM [GRMSMB].[RPTZ].[can_sb_all_13M]
+	  where 
+	  mfb = '6' and
+  ( [ic_ln_loan_status] in ('4','3','6')
+  and ig_cd <> 21)
+  or
+  ( [ic_ln_loan_status] is null
+  and ig_cd <> 21)
+  or
+  ([ic_ln_loan_status] is null
+  and ig_cd is null)
+  or
+    ([ic_ln_loan_status] in ('4','3','6')
+  and ig_cd = 21)
+    or
+  ([ic_ln_loan_status] = '7'
+  and ig_cd <> 21)
+    group by  [obs_month]
+     ,[program],[prd_special],product_type,new_channel,[security_type],[security_category]
+,province,industry,[Unit31p],[Unit91p],[NAL_unit]
+
