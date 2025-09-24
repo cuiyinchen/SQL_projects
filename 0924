@@ -1,0 +1,23 @@
+
+  select count(cid_num) as count_customer,  obs_month, count(*) as count_loan
+     ,sum(exposure) AS exposure
+	 ,sum(os_bal) AS os_bal
+     ,sum([Unit31p]) as Unit31p
+     ,sum([Bal31p]) as Bal31p
+     ,sum([Unit91p]) as Unit91p
+     ,sum([Bal91p]) as Bal91p
+     ,sum([NAL_unit]) as Nal_unit
+     ,sum(NAL_bal) as Nal_bal
+	 ,sum(limit) as Limit
+     ,industry, industry2, province, sic_code
+			FROM (select * from [GRMSMB].[LNDZ].[can_sb_all]  where obs_month >= 202408 and obs_month <= 202508)
+			where obs_month >= 202408 and obs_month <= 202508 			
+                        and industry not in ('Construction')
+			and industry2 not in ('Trucking','Restaurant')
+			and program = 'Core'
+			and Limit < 500000
+			and sic_code not in (8653, 8654, 8651, 8652, 0211, 8666, 6031, 7731, 7761, 7751, 8669, 8667, 8661, 8668, 7752, 8669, 8665, 8049, 8667, 8671)
+			and bus_established_date <= '2023-08-01'
+			GROUP BY obs_month, obs_quarter, industry, industry2, province, 
+			sic_code
+   
