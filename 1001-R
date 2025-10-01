@@ -1,0 +1,22 @@
+rm(list = ls())
+uscrome <- read.table(...)
+
+library(GGally)
+ggpairs(uscrime, columns = c("Po1", "Po2", "U1", "Ineq"))
+
+PCA <- prcomp(uscrime[,1:15], scale. = TRUE)
+summary(PCA)
+
+# matrix of eigen vectors
+PCA$rotation
+
+screeplot(PCA, type="lines", col="blue")
+
+PC <- PCA$x[,1:4]
+PC
+
+uscrimePC <- cbind(PC, uscrime[,16])
+modelPCA <- lm(V5~., data = as.data.frame(uscrimePC())
+summary(modelPCA)
+
+rm(list=ls())
