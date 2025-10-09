@@ -1,0 +1,6 @@
+Text.Combine(
+    { Date.ToText( Date.FromText( Text.From(Number.RoundDown([obs_month]/100)) & "-" & 
+                                  Text.End(Text.From([obs_month]),2) & "-01" ), "MMM" ),
+      Text.End(Text.From(Number.RoundDown([obs_month]/100)),2) },
+    ""
+)
