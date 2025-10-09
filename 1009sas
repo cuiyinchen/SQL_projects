@@ -522,3 +522,53 @@ proc export
 	replace;
 	sheet="MN_Portfolio";
 run;
+
+
+
+
+
+/* ===== Export all OP.* datasets into one Excel file, one sheet per table ===== */
+%macro export_all_to_xlsx(lib=op
+  ,outpath=M:\Data\GRM_SB\Steering Committee\Collection file
+  ,fname=sb_steerco_inventory_&mth..xlsx);
+
+  %local outfile dslist n i d;
+  %let outfile=&outpath\&fname;
+
+  /* Create/attach the workbook */
+  libname xel xlsx "&outfile";
+
+  /* Clear existing sheets so we fully refresh */
+  proc datasets lib=xel nolist;
+    kill;
+  quit;
+
+  /* Collect all DATA members from the source lib */
+  proc sql noprint;
+    select memname
+      into :dslist separated by ' '
+    from dictionary.tables
+    where libname = "%upcase(&lib)"
+      and memtype = 'DATA'
+    order by memname;
+  quit;
+
+  %let n=%sysfunc(countw(&dslist,%str( )));
+
+  %do i=1 %to &n;
+    %let d=%scan(&dslist,&i,%str( ));
+
+    /* Write one sheet with the same name as the table */
+    data xel.&d;
+      set &lib..&d;
+    run;
+  %end;
+
+  /* Close the workbook */
+  libname xel clear;
+%mend;
+
+/* === Call the macro to export everything under OP === */
+%export_all_to_xlsx(lib=op
+  ,outpath=M:\Data\GRM_SB\Steering Committee\Collection file
+  ,fname=sb_steerco_inventory_&mth..xlsx);
