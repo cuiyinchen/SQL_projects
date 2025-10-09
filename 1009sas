@@ -525,48 +525,69 @@ run;
 
 
 
+/* ==== 设置输出目录（带空格没问题） ==== */
+%let outdir = M:\Data\GRM_SB\Steering Committee\Collection file;
 
+/* ==== 宏：把某个库(默认OP)下的所有数据表导到同一个xlsx，每表一页 ==== */
+%macro export_all_to_xlsx(lib=op, outpath=, fname=sb_steerco_inventory_&mth..xlsx, dslist=_ALL_);
+  %local outfile list n i dsn;
 
-/* ===== Export all OP.* datasets into one Excel file, one sheet per table ===== */
-%macro export_all_to_xlsx(lib=op
-  ,outpath=M:\Data\GRM_SB\Steering Committee\Collection file
-  ,fname=sb_steerco_inventory_&mth..xlsx);
+  /* outpath 必填，避免在宏形参里放带空格的默认值 */
+  %if %length(&outpath)=0 %then %do;
+    %put ERROR: export_all_to_xlsx(): outpath= is required.;
+    %return;
+  %end;
 
-  %local outfile dslist n i d;
-  %let outfile=&outpath\&fname;
+  /* 组合完整文件名 */
+  %let outfile=%sysfunc(catx(\,&outpath,&fname));
 
-  /* Create/attach the workbook */
+  /* 用 XLSX 引擎创建/打开工作簿 */
   libname xel xlsx "&outfile";
 
-  /* Clear existing sheets so we fully refresh */
-  proc datasets lib=xel nolist;
-    kill;
+  /* 清空已存在的所有sheet，确保全量刷新 */
+  proc datasets lib=xel nolist; 
+    kill; 
   quit;
 
-  /* Collect all DATA members from the source lib */
-  proc sql noprint;
-    select memname
-      into :dslist separated by ' '
-    from dictionary.tables
-    where libname = "%upcase(&lib)"
-      and memtype = 'DATA'
-    order by memname;
-  quit;
+  /* 取要导出的数据集列表：默认导出该库下全部DATA表 */
+  %if %upcase(&dslist) = _ALL_ %then %do;
+    proc sql noprint;
+      select memname into :list separated by ' '
+      from dictionary.tables
+      where libname = "%upcase(&lib)"
+        and memtype = 'DATA'
+      order by memname;
+    quit;
+  %end;
+  %else %do;
+    %let list=&dslist;
+  %end;
 
-  %let n=%sysfunc(countw(&dslist,%str( )));
+  %let n=%sysfunc(countw(&list,%str( )));
+  %if &n = 0 %then %do;
+    %put NOTE: export_all_to_xlsx(): No datasets found in &lib..;
+  %end;
 
+  /* 循环写入：每个数据集 -> 一个sheet（sheet名=数据集名） */
   %do i=1 %to &n;
-    %let d=%scan(&dslist,&i,%str( ));
-
-    /* Write one sheet with the same name as the table */
-    data xel.&d;
-      set &lib..&d;
+    %let dsn=%scan(&list,&i,%str( ));
+    data xel.&dsn;
+      set &lib..&dsn;
     run;
   %end;
 
-  /* Close the workbook */
+  /* 关闭工作簿 */
   libname xel clear;
 %mend;
+
+/* ==== 调用：导出 OP 库的所有结果表到一个文件 ==== */
+%export_all_to_xlsx(
+  lib=op,
+  outpath=&outdir,
+  fname=sb_steerco_inventory_&mth..xlsx
+);
+/* 现在只要改上面的 %let mth=202508; 为 202509，就会生成新文件名 */
+
 
 /* === Call the macro to export everything under OP === */
 %export_all_to_xlsx(lib=op
