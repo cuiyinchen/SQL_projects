@@ -1,0 +1,45 @@
+/* ===== Month token & output file ===== */
+%let mth   = 202508;   /* 改这里生成新文件名，例如 202509 */
+%let xfile = M:\Data\GRM_SB\Steering Committee\Collection file\sb_steerco_inventory_&mth..xlsx;
+/* 如果网络盘写入仍有问题，先用本地 WORK 测试： */
+/* %let xfile = %sysfunc(pathname(work))\sb_steerco_inventory_&mth..xlsx; */
+
+/* ===== List datasets to export (sheet = dataset name) ===== */
+%let _export_list =
+  Summarized_DB
+  Summary_DB
+  Cust_Summary_DB
+  Vintage_6MOB
+  Vintage_12MOB
+  Num_Customers
+  IG_source
+  MN_Portfolio
+;
+
+/* ===== One-shot export via ODS EXCEL (skip missing datasets) ===== */
+ods _all_ close;
+ods excel file="&xfile" options(sheet_interval="none" embedded_titles='yes' frozen_headers='yes');
+
+%macro _sheet(dsn);
+  %if %sysfunc(exist(op.&dsn)) %then %do;
+    ods excel options(sheet_name="&dsn");
+    title "&dsn";
+    proc print data=op.&dsn noobs; run;
+    title;
+  %end;
+  %else %put WARNING: op.&dsn does not exist. Skipping.;
+%mend;
+
+%macro export_all(list=&_export_list);
+  %local i n name;
+  %let n=%sysfunc(countw(&list,%str( )));
+  %do i=1 %to &n;
+    %let name=%scan(&list,&i,%str( ));
+    %_sheet(&name);
+  %end;
+%mend;
+
+%export_all();
+ods excel close;
+
+%put NOTE: Export completed to &xfile;
