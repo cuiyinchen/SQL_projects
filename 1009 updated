@@ -1,72 +1,24 @@
+/* ---- Month token for filename ---- */
+%let mth = 202508;
 
-%MACRO summary(metrics);
-proc export data = &metrics
-      outfile= "P:\Auto Finance Risk\Reporting\Regular Reporting\Port_Monthlydata\Trending\Monthly Input\&yr_mth._PowerBI_Input_dre.xlsx"
-      dbms = xlsx replace;
-	  sheet = "&metrics";
-      run;
-%MEND;
+/* ---- One target workbook; changes with &mth ---- */
+%let xfile = M:\Data\GRM_SB\Steering Committee\Collection file\sb_steerco_inventory_&mth..xlsx;
 
-%summary(app_volume);
-%summary(app_by_condition);
-%summary(app_by_BRI);
-%summary(app_by_star);
-%summary(app_by_score);
-%summary(app_by_subvent);
-%summary(dre_approve_rate);
-%summary(ace_approve_rate);
-%summary(final_approve_rate);
-%summary(auto_approve_rate);
-%summary(auto_decline_rate);
-%summary(POI_rate);
-%summary(booking_rate);
-%summary(dlq_vintage);
+/* ---- Macro: export one dataset (sheet name = dataset name) ---- */
+%macro summary(dsn, lib=op, xlsx=&xfile);
+  proc export data=&lib..&dsn
+      outfile="&xlsx"
+      dbms=xlsx replace;
+      sheet="&dsn";
+  run;
+%mend;
 
-
-proc sql;
-create table book_by_star_rating as 
-select mth_end_dt,
-       prd_split,
-       sum(case when coalesce(star_rating_cd_app, star_rating_cd) = '0' then booked_amt else 0 end) / sum(booked_amt) as star_0_book,
-       sum(case when coalesce(star_rating_cd_app, star_rating_cd) = '1' then booked_amt else 0 end) / sum(booked_amt) as star_1_book,
-	   sum(case when coalesce(star_rating_cd_app, star_rating_cd) = '2' then booked_amt else 0 end) / sum(booked_amt) as star_2_book,
-	   sum(case when coalesce(star_rating_cd_app, star_rating_cd) = '3' then booked_amt else 0 end) / sum(booked_amt) as star_3_book,
-	   sum(case when coalesce(star_rating_cd_app, star_rating_cd) = '4' then booked_amt else 0 end) / sum(booked_amt) as star_4_book,
-	   sum(case when coalesce(star_rating_cd_app, star_rating_cd) = '5' then booked_amt else 0 end) / sum(booked_amt) as star_5_book,
-	   sum(case when coalesce(star_rating_cd_app, star_rating_cd) = '6' then booked_amt else 0 end) / sum(booked_amt) as star_6_book,
-	   sum(case when coalesce(star_rating_cd_app, star_rating_cd) = '7' then booked_amt else 0 end) / sum(booked_amt) as star_7_book,
-	   sum(case when coalesce(star_rating_cd_app, star_rating_cd) = '' then booked_amt else 0 end) / sum(booked_amt) as star_missing_book
-from auto_app
-where acct_stat_cd = 'OP' and prd_split = 'SDA' and tm_on_book = 0
-group by mth_end_dt, prd_split
-order by mth_end_dt; 
-quit;
-
-data data.book_by_star_rating;
-set data.book_by_star_rating book_by_star_rating;
-run;
-
-/** Append latest data to historical **/
-%MACRO summary(metrics);
-data data.&metrics;
-	set data.&metrics;
-	if mth_end_dt = "&month_end"d then delete;
-	run;
-
-data data.&metrics;
-set data.&metrics &metrics;
-run;
-
-proc export data = data.&metrics
-      outfile= "P:\Auto Finance Risk\Reporting\Regular Reporting\Port_Monthlydata\Trending\Monthly Input\&yr_mth._PowerBI_Input.xlsx"
-      dbms = xlsx replace;
-	  sheet = "&metrics";
-      run;
-%MEND;
-
-%summary(dlq_cv);
-%summary(avg_os);
-%summary(avg_booked);
-%summary(avg_booked_ltv);
-%summary(cv_score);
-%summary(booked_by_score);
+/* ---- Export each table to the same workbook (one sheet per table) ---- */
+%summary(Summarized_DB);
+%summary(Summary_DB);
+%summary(Cust_Summary_DB);
+%summary(Vintage_6MOB);
+%summary(Vintage_12MOB);
+%summary(Num_Customers);
+%summary(IG_source);
+%summary(MN_Portfolio);
