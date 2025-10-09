@@ -1,0 +1,550 @@
+/* The purpose of the code is to produce SB portfolio data and PBI dashboard
+to replace the original SteerCo Excel worksheet; with output datasets rolling back
+to 24 months prior. */
+/* Output data files: M:\Data\GRM_SB\Steering Committee\Collection file */
+
+signoff;
+%let mynode=iw611-prod.bns 7551;
+options comamid=tcp remote=mynode;
+signon user="s2254426" password="Tracy981105!!!";
+%let rm_server=mynode;
+rsubmit; 
+libname cb db2 dsn='owstar'  schema='CB' user='s2254426' password='Tracy981105!!!'; 
+libname test db2 dsn='owstar'   schema='OWTACT'  user='s2254426' password='Tracy981105!!!';
+libname SMBUS db2 database=owstar   schema=SMBUS user='s2254426' password='Tracy981105!!!';
+libname dlyserv '/sasdata/risk/SBO/DAILY_PORTFOLIO_REPORTS';
+libname lmt  '/sasdata/riskcoll/backend_team/lmt/cat_codes/try/EDL_DEC21';
+libname swsbo     '/sasdata/risk/SBO/SW_SBO_REPORTS';
+endrsubmit;
+libname dlyserv slibref = dlyserv server = mynode;
+libname swsbo slibref=swsbo server=mynode;
+libname op 'M:\Data\GRM_SB\Steering Committee\Collection file';
+
+/* obs month for output filename */
+%let mth = 202508;
+
+/** Summarized_DB **/
+/*already a rolling back 2 years*/
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table op.Summarized_DB as
+select * from connection to odbc (
+
+SELECT [source]
+	,[channel]
+	,[decision]
+	,[decision_mth]
+	,[ig]
+	,[exception]
+	,[security_type]
+	,[industry_group]
+	,[Province_code]
+	,[region]
+	,[Program2]
+	,sum([amt_approved]) as approved_amount
+	,sum([amt_accepted]) as accepted_amount
+	,sum([num_applications]) as appilcation_num
+FROM [GRMSMB].[RPTZ].[sb_orig_combined]
+	group by 
+		[source]
+		,[channel]
+		,[decision]
+		,[decision_dt]
+		,[decision_mth]
+		,[ig]
+		,[exception]
+		,[security_type]
+		,[industry_group]
+		,[Province_code]
+		,[region]
+		,[Program2]
+		,[sic_code]
+
+);
+disconnect from ODBC;
+QUIT;
+
+/*proc freq data=op.summarized_db;*/
+/*tables decision_mth; quit;*/
+
+
+/** Summary_DB **/
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table op.Summary_DB as
+select * from connection to odbc (
+
+SELECT 
+	[obs_month]
+	,[program]
+	,count(*) as count_loan
+	,sum([os_bal]) as os_bal
+	,sum([exposure]) as exposure
+	,[Unit31p] as Unit31p
+	,sum([Bal31p]) as Bal31p
+	,[Unit91p] as Unit91p
+	,sum([Bal91p]) as Bal91p
+	,[NAL_unit] as Nal_unit
+	, [prd_special]
+	,product_type
+	,new_channel
+	,[security_type]
+	,[security_category]
+	,province
+	,industry
+FROM [GRMSMB].[LNDZ].[can_sb_all]
+	where  obs_month >= convert(char(6), dateadd(month,-26,getdate()),112) and (   
+		( [ic_ln_loan_status] in ('4','3','6')
+		and ig_cd <> 21)
+		or
+		( [ic_ln_loan_status] is null
+		and ig_cd <> 21)
+		or
+		([ic_ln_loan_status] is null
+		and ig_cd is null)
+		or
+		([ic_ln_loan_status] in ('4','3','6')
+		and ig_cd = 21)
+		or
+		([ic_ln_loan_status] = '7'
+		and ig_cd <> 21) )
+	group by  [obs_month]
+		,[program],[prd_special],product_type,new_channel,[security_type],[security_category]
+		,province,industry,[Unit31p],[Unit91p],[NAL_unit]
+
+);
+disconnect from ODBC;
+QUIT;
+
+/*proc freq data=op.Summary_DB;*/
+/*tables obs_month; quit;*/
+
+
+/* Cust_Summary_DB */
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table op.Cust_Summary_DB as
+select * from connection to odbc (
+SELECT 
+	[obs_month]
+	,[segment]
+	,[Program]
+	,[province]
+	,[industry]
+	,[industry2]
+	,count(*) as Customer_Count
+	,sum([os_bal]) as os_bal
+	,sum([exposure]) as exposure
+	,sum([Unit31p]) as Unit31p
+	,sum([Bal31p]) as Bal31p
+	,sum([Unit91p]) as Unit91p
+	,sum([Bal91p]) as Bal91p
+	,sum([NAL_unit]) as Nal_unit
+	,sum([NAL_bal]) as Nal_bal
+FROM [GRMSMB].[LNDZ].[can_sb_enterprise_all]
+where obs_month >= convert(char(6), dateadd(month,-26,getdate()),112)
+group by  [obs_month]
+	,[segment]
+	,[Program]
+	,[province]
+	,[industry]
+	,[industry2]
+);
+disconnect from ODBC;
+QUIT;
+
+/*proc freq data=op.Cust_Summary_DB;*/
+/*tables obs_month; quit;*/
+
+
+	/* Vintage 6 MOB */
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table op.Vintage_6MOB as
+select * from connection to odbc (
+SELECT 
+
+	 count(*) as count_loan
+	 ,count(account_num) as account_num
+	 ,count([cid_num]) as customer_num
+	 ,sum([os_bal]) as os_bal
+	 ,sum([exposure]) as exposure
+	 ,sum([Unit31p]) as Unit31p
+     ,sum([Bal31p]) as Bal31p
+     ,sum([Unit91p]) as Unit91p
+     ,sum([Bal91p]) as Bal91p
+     ,sum([NAL_unit]) as Nal_unit
+     ,[prd_special]
+     ,product_type
+	 ,prd_desc
+     ,[obs_month]
+	 ,open_month
+     ,[program]
+	 ,security_type
+	 ,security_category
+	 ,sic_group
+	 ,sic_category
+	 ,industry
+	 ,industry2
+	 ,[ig_cd]
+	 ,[crs_cust_ig]
+	  FROM [GRMSMB].[RPTZ].[can_sb_all_13M]
+	  where mfb = '6'
+and
+(
+ ( [ic_ln_loan_status] in ('4','3','6')
+  and ig_cd <> 21)
+  or
+  ( [ic_ln_loan_status] is null
+  and ig_cd <> 21)
+  or
+  ([ic_ln_loan_status] is null
+  and ig_cd is null)
+  or
+    ([ic_ln_loan_status] in ('4','3','6')
+  and ig_cd = 21)
+    or
+  ([ic_ln_loan_status] = '7'
+  and ig_cd <> 21))
+    group by  
+     [prd_special]
+     ,product_type
+	 ,prd_desc
+     ,[obs_month]
+	 ,open_month
+     ,[program]
+	 ,security_type
+	 ,security_category
+	 ,sic_group
+	 ,sic_category
+	 ,industry
+	 ,industry2
+	 ,[ig_cd]
+	 ,[crs_cust_ig]
+
+union all
+
+SELECT 
+
+	 count(*) as count_loan
+	 ,count(account_num) as account_num
+	 ,count([cid_num]) as customer_num
+	 ,sum([os_bal]) as os_bal
+	 ,sum([exposure]) as exposure
+	 ,sum([Unit31p]) as Unit31p
+     ,sum([Bal31p]) as Bal31p
+     ,sum([Unit91p]) as Unit91p
+     ,sum([Bal91p]) as Bal91p
+     ,sum([NAL_unit]) as Nal_unit
+     ,[prd_special]
+     ,product_type
+	 ,prd_desc
+     ,[obs_month]
+	 ,open_month
+     ,[program]
+	 ,security_type
+	 ,security_category
+	 ,sic_group
+	 ,sic_category
+	 ,industry
+	 ,industry2
+	 ,[ig_cd]
+	 ,[crs_cust_ig]
+
+	  FROM [GRMSMB].[LNDZ].[can_sb_all]
+	  where obs_month  = '202001'
+	  and mfb = '6'
+    group by  
+     [prd_special]
+     ,product_type
+	 ,prd_desc
+     ,[obs_month]
+	 ,open_month
+     ,[program]
+	 ,security_type
+	 ,security_category
+	 ,sic_group
+	 ,sic_category
+	 ,industry
+	 ,industry2
+	 ,[ig_cd]
+	 ,[crs_cust_ig]
+);
+disconnect from ODBC;
+QUIT;
+
+/*proc freq data=op.Vintage_6MOB;*/
+/*tables obs_month; quit;*/
+
+
+/* Vintage 12 MOB */
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table op.Vintage_12MOB as
+select * from connection to odbc (
+SELECT 
+
+	count(*) as count_loan
+	,count(account_num) as account_num
+	,count([cid_num]) as customer_num
+	,sum([os_bal]) as os_bal
+	,sum([exposure]) as exposure
+	,sum([Unit31p]) as Unit31p
+	,sum([Bal31p]) as Bal31p
+	,sum([Unit91p]) as Unit91p
+	,sum([Bal91p]) as Bal91p
+	,sum([NAL_unit]) as Nal_unit
+	,[prd_special]
+	,product_type
+	,prd_desc
+	,[obs_month]
+	,open_month
+	,[program]
+	,security_type
+	,security_category
+	,sic_group
+	,sic_category
+	,industry
+	,industry2
+	,[ig_cd]
+	,[crs_cust_ig]
+FROM [GRMSMB].[RPTZ].[can_sb_all_13M]
+	where mfb = '12'
+		and
+		(
+		( [ic_ln_loan_status] in ('4','3','6')
+		and ig_cd <> 21)
+		or
+		( [ic_ln_loan_status] is null
+		and ig_cd <> 21)
+		or
+		([ic_ln_loan_status] is null
+		and ig_cd is null)
+		or
+		([ic_ln_loan_status] in ('4','3','6')
+		and ig_cd = 21)
+		or
+		([ic_ln_loan_status] = '7'
+		and ig_cd <> 21))
+	group by  
+		[prd_special]
+		,product_type
+		,prd_desc
+		,[obs_month]
+		,open_month
+		,[program]
+		,security_type
+		,security_category
+		,sic_group
+		,sic_category
+		,industry
+		,industry2
+		,[ig_cd]
+		,[crs_cust_ig]
+
+		union all
+
+	SELECT 
+
+		count(*) as count_loan
+		,count(account_num) as account_num
+		,count([cid_num]) as customer_num
+		,sum([os_bal]) as os_bal
+		,sum([exposure]) as exposure
+		,sum([Unit31p]) as Unit31p
+		,sum([Bal31p]) as Bal31p
+		,sum([Unit91p]) as Unit91p
+		,sum([Bal91p]) as Bal91p
+		,sum([NAL_unit]) as Nal_unit
+		,[prd_special]
+		,product_type
+		,prd_desc
+		,[obs_month]
+		,open_month
+		,[program]
+		,security_type
+		,security_category
+		,sic_group
+		,sic_category
+		,industry
+		,industry2
+		,[ig_cd]
+		,[crs_cust_ig]
+	FROM [GRMSMB].[LNDZ].[can_sb_all]
+		where obs_month  = '202001'
+			and mfb = '12'
+		group by  
+			[prd_special]
+			,product_type
+			,prd_desc
+			,[obs_month]
+			,open_month
+			,[program]
+			,security_type
+			,security_category
+			,sic_group
+			,sic_category
+			,industry
+			,industry2
+			,[ig_cd]
+			,[crs_cust_ig]
+);
+disconnect from ODBC;
+QUIT;
+
+/*proc freq data=op.Vintage_12MOB;*/
+/*tables obs_month; quit;*/
+
+
+/* Num_Customers */
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table op.Num_Customers as
+select * from connection to odbc (
+SELECT  obs_month,count(distinct [primary_cust_cid] ) as num_cust
+	FROM [GRMSMB].[LNDZ].[can_sb_all]
+	where obs_month >= convert(char(6), dateadd(month,-26,getdate()),112)
+		group by obs_month
+			order by 1
+);
+disconnect from ODBC;
+QUIT;
+
+/*proc freq data=op.Num_Customers;*/
+/*tables obs_month; quit;*/
+
+
+/* IG */
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table op.IG_source as
+select * from connection to odbc (
+SELECT 
+	[obs_month]
+	,[program]
+	,ig_code
+	,case 
+	when ig_code in ('90','95','98') then 'IG_90+'
+	when ig_code in ('85','87') then 'IG_85_87'
+	when ig_code in ('83') then 'IG_83'
+	when ig_code in ('80') then 'IG_80'
+	when ig_code in ('77') then 'IG_77'
+	when ig_code in ('70','73','75') then 'IG_70_75'
+	when ig_code in ('60','65') then 'IG_60_65'
+	else IG_code 
+end as IG_Code2
+,case 
+when ig_code in ('90','95','98') then 'IG_90+'
+when ig_code in ('85','87','83','80') then 'IG_80_87'
+when ig_code in ('77','70','73','75','60','65') then 'IG<80'
+else IG_code 
+end as IG_Code3
+,sum([os_bal]) as os_bal
+,sum([exposure]) as exposure
+,sum([Unit31p]) as Unit31p
+,sum([Bal31p]) as Bal31p
+,sum([Unit91p]) as Unit91p
+,sum([Bal91p]) as Bal91p
+,product_type
+FROM [GRMSMB].[LNDZ].[can_sb_all]
+where obs_month >= convert(char(6), dateadd(month,-26,getdate()),112) and
+ ig_code in ('90','95','98','85','87','83','80','77','70','73','75','60','65')
+group by  [obs_month]
+		,[program],product_type,ig_cd,ig_code,
+		crs_cust_ig
+);
+disconnect from ODBC;
+QUIT;
+
+
+/* MN Portfolio */
+PROC SQL;
+connect to ODBC (datasrc = 'BOSS');
+create table op.MN_Portfolio as
+select * from connection to odbc (
+
+SELECT 
+  [obs_month],
+  [program],
+  count(*) as account_count,
+  count(distinct cid_num) as customer_count,
+  sum([os_bal]) as os_bal,
+  sum([exposure]) as exposure,
+  [Unit31p] as Unit31p,
+  sum([Bal31p]) as Bal31p,
+  [Unit91p] as Unit91p,
+  sum([Bal91p]) as Bal91p,
+  [NAL_unit] as Nal_unit,
+  [prd_special],
+  product_type,
+  new_channel,
+  [security_type],
+  [security_category],
+  province,
+  industry,
+  ig_code,
+  CASE 
+    WHEN mfb = '0' THEN 'New_Booking'
+    when mfb = '6' THEN 'Vintage_6M'
+    When mfb = '12' THEN 'Vintage_12M'
+  ELSE null
+  end as MFB_Group  
+  FROM [GRMSMB].[LNDZ].[can_sb_all]
+  WHERE
+  (
+    ic_ln_loan_status IN ('3', '4', '6')
+    OR (ic_ln_loan_status IS NULL AND (ig_cd IS NULL OR ig_cd <> 21))
+    OR (ic_ln_loan_status = '7' AND ig_cd <> 21)
+  )
+  and obs_date >= DATEADD(MONTH,-26,getdate())
+  group by  [obs_month]
+  ,[program],[prd_special],product_type,new_channel,[security_type],[security_category]
+  ,province,industry,[Unit31p],[Unit91p],[NAL_unit],ig_code, 
+  CASE 
+    WHEN mfb = '0' THEN 'New_Booking'
+    when mfb = '6' THEN 'Vintage_6M'
+    When mfb = '12' THEN 'Vintage_12M'
+  ELSE null END
+
+  );
+disconnect from ODBC;
+QUIT;
+
+/*proc freq data=op.MN_Portfolio;*/
+/*tables obs_month; quit;*/
+
+
+/* export files */
+/*proc export*/
+/*	data = op.MN_Portfolio */
+/*	dbms = xlsx*/
+/*	outfile="M:\Data\GRM_SB\Steering Committee\Collection file\sb_steerco_inventory_&mth..xlsx"*/
+/*	replace;*/
+/*	sheet="MN_Portfolio";*/
+/*run;*/
+
+
+/* ---- Month token for filename ---- */
+%let mth = 202508;
+
+/* ---- One target workbook; changes with &mth ---- */
+%let xfile = M:\Data\GRM_SB\Steering Committee\Collection file\sb_steerco_inventory_&mth..xlsx;
+
+/* ---- Macro: export one dataset (sheet name = dataset name) ---- */
+%macro summary(dsn, lib=op, xlsx=&xfile);
+  proc export data=&lib..&dsn
+      outfile="&xlsx"
+      dbms=xlsx replace;
+      sheet="&dsn";
+  run;
+%mend;
+
+/* ---- Export each table to the same workbook (one sheet per table) ---- */
+%summary(Summarized_DB);
+%summary(Summary_DB);
+%summary(Cust_Summary_DB);
+%summary(Vintage_6MOB);
+%summary(Vintage_12MOB);
+%summary(Num_Customers);
+%summary(IG_source);
+%summary(MN_Portfolio);
