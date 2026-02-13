@@ -1,4 +1,32 @@
 
+QoQ Amount =
+VAR CurrentYear =
+    VALUE(SELECTEDVALUE('YourTable'[Year]))
+
+VAR CurrentQuarterNum =
+    VALUE(SUBSTITUTE(SELECTEDVALUE('YourTable'[Quarter]),"Q",""))
+
+VAR PrevQuarterNum =
+    IF(CurrentQuarterNum = 1, 4, CurrentQuarterNum - 1)
+
+VAR PrevYear =
+    IF(CurrentQuarterNum = 1, CurrentYear - 1, CurrentYear)
+
+RETURN
+CALCULATE(
+    [Total Amount],
+    'YourTable'[Year] = FORMAT(PrevYear, "0"),
+    'YourTable'[Quarter] = "Q" & PrevQuarterNum
+)
+-
+[Total Amount]
+
+
+
+
+
+
+
 YoY Amount =
 VAR CurrentYear =
     VALUE(SELECTEDVALUE('YourTable'[Year]))
