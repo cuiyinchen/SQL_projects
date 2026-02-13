@@ -1,3 +1,32 @@
+
+YoY Amount =
+VAR CurrentYear =
+    VALUE(SELECTEDVALUE('YourTable'[Year]))
+
+VAR CurrentQuarter =
+    SELECTEDVALUE('YourTable'[Quarter])
+
+RETURN
+CALCULATE(
+    [Total Amount],
+    'YourTable'[Year] = FORMAT(CurrentYear - 1, "0"),
+    'YourTable'[Quarter] = CurrentQuarter
+)
+-
+[Total Amount]
+
+
+
+
+
+
+
+
+
+
+
+
+
 = Table.AddColumn(#"Added Custom1", "quarter_number", 
     each 
         if [fiscal_quarter] = "Q1" then 1
