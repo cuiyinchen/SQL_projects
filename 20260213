@@ -1,0 +1,45 @@
+= Table.AddColumn(#"Added Custom1", "quarter_number", 
+    each 
+        if [fiscal_quarter] = "Q1" then 1
+        else if [fiscal_quarter] = "Q2" then 2
+        else if [fiscal_quarter] = "Q3" then 3
+        else if [fiscal_quarter] = "Q4" then 4
+        else null
+)
+
+YoY Amount =
+VAR CurrentYear = MAX('YourTable'[Year])
+VAR CurrentQuarter = MAX('YourTable'[Quarter])
+RETURN
+CALCULATE(
+    [Total Amount],
+    'YourTable'[Year] = CurrentYear
+)
+-
+CALCULATE(
+    [Total Amount],
+    'YourTable'[Year] = CurrentYear - 1
+)
+
+QoQ Amount =
+VAR CurrentYear = MAX('YourTable'[Year])
+VAR CurrentQuarterNum = MAX('YourTable'[Quarter Number])
+
+VAR PrevQuarterNum =
+    IF(CurrentQuarterNum = 1, 4, CurrentQuarterNum - 1)
+
+VAR PrevYear =
+    IF(CurrentQuarterNum = 1, CurrentYear - 1, CurrentYear)
+
+RETURN
+CALCULATE(
+    [Total Amount],
+    'YourTable'[Year] = CurrentYear &&
+    'YourTable'[Quarter Number] = CurrentQuarterNum
+)
+-
+CALCULATE(
+    [Total Amount],
+    'YourTable'[Year] = PrevYear &&
+    'YourTable'[Quarter Number] = PrevQuarterNum
+)
