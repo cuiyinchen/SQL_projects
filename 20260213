@@ -1,5 +1,42 @@
 
-QoQ Amount =
+QoQ Amount =QoQ Amount =
+VAR CurrentYear =
+    VALUE(SELECTEDVALUE(BB_NWO[fiscal_year]))
+
+VAR CurrentQuarterNum =
+    VALUE(
+        SUBSTITUTE(
+            SELECTEDVALUE(BB_NWO[fiscal_quarter]),
+            "Q",
+            ""
+        )
+    )
+
+VAR PrevQuarterNum =
+    IF(CurrentQuarterNum = 1, 4, CurrentQuarterNum - 1)
+
+VAR PrevYear =
+    IF(CurrentQuarterNum = 1, CurrentYear - 1, CurrentYear)
+
+VAR PreviousAmount =
+    CALCULATE(
+        [Total Amount],
+        BB_NWO[fiscal_year] = FORMAT(PrevYear, "0"),
+        BB_NWO[fiscal_quarter] = "Q" & PrevQuarterNum
+    )
+
+RETURN
+    [Total Amount] - PreviousAmount
+
+
+
+
+
+
+
+
+
+
 VAR CurrentYear =
     VALUE(SELECTEDVALUE('YourTable'[Year]))
 
